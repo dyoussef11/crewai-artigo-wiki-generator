@@ -6,6 +6,11 @@ from datetime import datetime
 
 from crewai_artigo_wiki_generator.crew import CrewaiArtigoWikiGenerator
 
+from fastapi import FastAPI
+
+
+
+
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 # This main file is intended to be a way for you to run your

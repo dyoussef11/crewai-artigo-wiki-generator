@@ -1,17 +1,63 @@
 research_task:
   description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is {current_year}.
+    Realize uma pesquisa sobre o tópico fornecido utilizando a Wikipedia.
+
+    Instruções:
+    - Busque informações relevantes, atualizadas e de qualidade.
+    - Sintetize o conteúdo em pelo menos três parágrafos informativos.
+    - O texto deve ser claro, objetivo e livre de opiniões.
+    - Não inclua conteúdo especulativo ou desnecessário.
+    - Mantenha a linguagem técnica acessível e precisa.
+
   expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
+    Um resumo coeso de pelo menos três parágrafos sobre o tema, contendo os pontos principais da pesquisa.
+
   agent: researcher
 
 reporting_task:
   description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
+    Com base no conteúdo fornecido pelo pesquisador, escreva um artigo informativo com as seguintes características:
+
+    - Mínimo de 300 palavras.
+    - Estrutura clara com título, introdução, desenvolvimento e conclusão.
+    - Texto em português formal, natural e coeso.
+    - Não mencione que o conteúdo é gerado por IA ou baseado na Wikipedia.
+    - Enfatize a importância do tema quando possível.
+
   expected_output: >
-    A fully fledged report with the main topics, each with a full section of information.
-    Formatted as markdown without '```'
+    Um artigo completo, fluente, com linguagem humana, estruturado em parágrafos e com no mínimo 300 palavras.
+
   agent: reporting_analyst
+  depends_on: [research_task]
+
+review_task:
+  description: >
+    Revise o artigo gerado, atentando-se aos seguintes pontos:
+
+    - Ortografia, gramática e pontuação.
+    - Clareza e fluidez textual.
+    - Consistência do conteúdo com o objetivo proposto.
+    - Sugestões de melhoria, se necessário.
+
+    Se tudo estiver correto, apenas reescreva o texto corrigido com pequenas melhorias estilísticas.
+
+  expected_output: >
+    Uma versão revisada e polida do artigo, pronta para publicação.
+
+    O conteúdo final **deve estar formatado em JSON**, seguindo esta estrutura:
+
+    {
+      "titulo": "Título do artigo",
+      "secoes": [
+        {"subtitulo": "Introdução", "conteudo": "Texto da introdução"},
+        {"subtitulo": "Desenvolvimento", "conteudo": "Texto do desenvolvimento"}
+      ],
+      "conclusao": "Texto da conclusão",
+      "referencias": [
+        {"titulo": "Fonte 1", "link": "https://..."},
+        {"titulo": "Fonte 2", "link": "https://..."}
+      ]
+    }
+
+  agent: reviewer
+  depends_on: [reporting_task]
