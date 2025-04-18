@@ -1,16 +1,15 @@
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
 
-class Referencia(BaseModel):
-    titulo: str
-    link: str
-
-class Secao(BaseModel):
-    subtitulo: str
+class Paragrafo(BaseModel):
+    titulo: Optional[str] = Field(default=None)
     conteudo: str
 
 class Artigo(BaseModel):
     titulo: str
-    secoes: List[Secao]
-    conclusao: str
-    referencias: List[Referencia]
+    topico: str
+    data_criacao: datetime = Field(default_factory=datetime.now)
+    autor: Optional[str] = "Sistema Multiagente"
+    paragrafos: List[Paragrafo]
+    referencias: List[str] = []

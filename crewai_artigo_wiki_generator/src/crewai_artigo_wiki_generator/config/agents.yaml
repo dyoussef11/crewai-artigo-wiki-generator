@@ -15,6 +15,7 @@ reporting_analyst:
     Um redator profissional com experiência em transformar dados em conteúdo humano, natural e envolvente,
     com ênfase em clareza, coesão e impacto.
   verbose: true
+  allow_delegation: false
   instructions: >
     Com base no conteúdo fornecido pelo pesquisador sobre o tema "{topic}", escreva um artigo informativo com:
     - Mínimo de 300 palavras.
@@ -29,7 +30,8 @@ reviewer:
   backstory: >
     Um revisor editorial com vasta experiência em análise de textos, garantindo qualidade, correção e estilo adequado ao público.
   output_format: crewai_artigo_wiki_generator.models.article_model.Artigo
-  verbose: true
+  verbose: false
+  allow_delegation: false
   instructions: >
     Revise cuidadosamente o artigo sobre "{topic}", verificando ortografia, gramática, fluidez e estrutura.
   

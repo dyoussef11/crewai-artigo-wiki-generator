@@ -1,25 +1,18 @@
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task, tool
-from crewai_artigo_wiki_generator.tools.wikipedia_tool import WikipediaTool
-from crewai_artigo_wiki_generator.models.article_model import Artigo
+from tools.wikipedia_tool import WikipediaTool
+from models.article_model import Artigo
 
-# If you want to run a snippet of code before or after the crew starts,
-# you can use the @before_kickoff and @after_kickoff decorators
-# https://docs.crewai.com/concepts/crews#example-crew-class-with-decorators
 
 @CrewBase
 class CrewaiArtigoWikiGenerator():
     """CrewaiArtigoWikiGenerator crew"""
 
-    # Learn more about YAML configuration files here:
-    # Agents: https://docs.crewai.com/concepts/agents#yaml-configuration-recommended
-    # Tasks: https://docs.crewai.com/concepts/tasks#yaml-configuration-recommended
+    
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
 
-    # If you would like to add tools to your agents, you can learn more about it here:
-    # https://docs.crewai.com/concepts/agents#agent-tools
-    
+
     @tool
     def wikipedia_tool(self):
         print("Initializing Wikipedia Tool")
@@ -44,7 +37,7 @@ class CrewaiArtigoWikiGenerator():
     def reviewer(self) -> Agent:
         return Agent(
             config=self.agents_config['reviewer'],
-            # verbose=True
+            verbose=False
         )
 
     # To learn more about structured task outputs,
@@ -54,6 +47,7 @@ class CrewaiArtigoWikiGenerator():
     def research_task(self) -> Task:
         return Task(
             config=self.tasks_config['research_task'],
+            tools=[WikipediaTool()],
         )
 
     @task
@@ -67,6 +61,7 @@ class CrewaiArtigoWikiGenerator():
     def review_task(self) -> Task:
         return Task(
             config=self.tasks_config['review_task'],
+            output_pydantic=Artigo,
             output_file='article_final.md'
         )
 
@@ -76,10 +71,18 @@ class CrewaiArtigoWikiGenerator():
         # To learn how to add knowledge sources to your crew, check out the documentation:
         # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
 
+        if not self._is_valid_topic("" or " "):  # Exemplo de condição de interrupção
+            raise Exception("Tópico inválido, interrompendo o processo.")
+        
         return Crew(
             agents=self.agents, # Automatically created by the @agent decorator
             tasks=self.tasks, # Automatically created by the @task decorator
             process=Process.sequential,
+            output_pydantic=Artigo,
             verbose=True,
             # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
+        
+    def _is_valid_topic(self, topic: str) -> bool:
+            # Exemplo de verificação simples
+            return topic.lower() != " "

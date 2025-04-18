@@ -3,76 +3,75 @@ research_task:
     Realize uma pesquisa na Wikipedia sobre o seguinte tópico: "{topic}".
 
     Instruções:
-    - Busque informações relevantes, atualizadas e de qualidade.
-    - Sintetize o conteúdo em pelo menos três parágrafos informativos.
-    - O texto deve ser claro, objetivo e livre de opiniões.
-    - Não inclua conteúdo especulativo ou desnecessário.
-    - Mantenha a linguagem técnica acessível e precisa.
+    - Use exclusivamente a ferramenta `wikipedia_tool` para obter as informações.
+    - Não invente dados, apenas sintetize o conteúdo obtido da Wikipedia.
+    - Organize a resposta em pelo menos 5 parágrafos coesos e informativos.
+    - O texto deve ser claro, objetivo, técnico e acessível, livre de opiniões e especulações.
+    - Não inclua repetições ou frases genéricas.
   
   expected_output: >
-    Um resumo em formato de texto corrido com pelo menos cinco parágrafos informativos,
-    contendo dados relevantes e confiáveis sobre o tópico pesquisado, extraídos da Wikipedia.
+    Um texto corrido e coeso com pelo menos cinco parágrafos informativos e relevantes,
+    exclusivamente baseado no conteúdo extraído da Wikipedia através da ferramenta `wikipedia_tool`.
 
   agent: researcher
 
 reporting_task:
   description: >
-    Com base no conteúdo fornecido pelo pesquisador, escreva um artigo informativo com as seguintes características:
+    Com base EXCLUSIVA no conteúdo gerado pelo pesquisador, escreva um artigo informativo com as seguintes características:
 
     - Mínimo de 300 palavras.
-    - Estrutura clara com título, introdução, desenvolvimento e conclusão.
-    - Texto em português formal, natural e coeso.
-    - Não mencione que o conteúdo é gerado por IA ou baseado na Wikipedia.
-    - Enfatize a importância do tema quando possível.
-
+    - Estrutura com título, introdução, desenvolvimento e conclusão.
+    - Texto em português formal, fluente e coeso.
+    - Não acrescente informações novas nem inventadas: use apenas o conteúdo da etapa anterior.
+    - NÃO mencione que o texto foi gerado por IA ou retirado da Wikipedia.
+    - Sempre que possível, destaque a relevância ou impacto do tema.
+  
   expected_output: >
-    Um artigo completo, fluente, com linguagem humana, estruturado em parágrafos e com no mínimo 300 palavras.
-
+    Um artigo completo, com no mínimo 300 palavras, estruturado em parágrafos lógicos e coesos,
+    totalmente baseado no conteúdo entregue pelo pesquisador, sem extrapolar as informações fornecidas.
+  
   agent: reporting_analyst
   depends_on: [research_task]
+
+  # A etapa abaixo pode ajudar a definir o título se não for retornado explicitamente
+  pre_process: |
+    if "titulo" not in article:
+        article["titulo"] = "Artigo sobre: " + topic
+
+
 
 review_task:
   description: >
     Revise o artigo gerado, atentando-se aos seguintes pontos:
 
-    - Ortografia, gramática e pontuação.
+    - Ortografia, gramática, pontuação e estilo.
     - Clareza, coesão e fluidez textual.
-    - Consistência do conteúdo com o objetivo proposto.
-    - Estrutura lógica com começo, meio e fim.
-    - Sugestões de melhoria, caso necessário, com foco em legibilidade e precisão técnica.
-    - Se necessário, reescreva partes para maior coerência e completude argumentativa.
+    - Consistência com o conteúdo original fornecido.
+    - Estrutura lógica: introdução, desenvolvimento e conclusão.
+    - Sugira melhorias e reescreva trechos para maior precisão e legibilidade, se necessário.
 
-    Organize o conteúdo revisado no **formato de artigo textual estruturado**, obedecendo os seguintes elementos obrigatórios:
+    O resultado da revisão deve estar estruturado como um dicionário com os seguintes campos:
 
-    - Título centralizado (representativo e impactante)
-    - Nome(s) do(s) autor(es) alinhados à direita (Deixe o nome vazio)
-    - Seções com subtítulos à esquerda (Resumo, Introdução, Desenvolvimento, etc.)
-    - Conclusão clara e bem fundamentada
-    - Referências ao final, no padrão ABNT, com link e data de acesso
-    - Texto justificado, com recuo de parágrafo (1 TAB ou 1,25 cm)
-
-    Aplique as normas de formatação abaixo:
-
-    - Papel: A4 (branco ou reciclado)
-    - Margens: esquerda e superior de 3 cm; direita e inferior de 2 cm
-    - Fonte: Times New Roman, Arial, Calibri ou Verdana, tamanho 12
-    - Espaçamento entre linhas: 1,5 no corpo do texto; simples em citações longas, notas de rodapé e referências
-    - Tamanho da fonte 10 para: citações longas (com mais de 3 linhas), rodapés, paginação, referências e legendas
-    - Paginação: canto superior direito, em algarismos arábicos, fonte 10 (primeira página é contada, mas não numerada)
-    - Distância entre seções: uma linha em branco (espaço 1,5)
-    - Texto final deve ser justificado
+    - titulo: Título centralizado do artigo.
+    - topico: Tópico original do artigo (mantenha o mesmo do input).
+    - data_criacao: Data de criação ou revisão do artigo (use datetime atual).
+    - autor: Fixe como "MultiAgente AI".
+    - paragrafos: Lista de dicionários com as seções do artigo. Cada item deve ter:
+      - titulo: Um dos títulos: "Resumo", "Introdução", "Desenvolvimento", "Conclusão".
+      - conteudo: Texto da seção, revisado e justificado com recuo de parágrafo.
+    - referencias: Lista de strings no formato ABNT com link e data de acesso.
 
   expected_output: >
-    Um artigo **revisado e polido, pronto para publicação ou submissão institucional**, contendo:
+    Um dicionário com as chaves:
+      - titulo (str)
+      - topico (str)
+      - data_criacao (datetime)
+      - autor (str = "MultiAgente AI")
+      - paragrafos (List[{"titulo": str, "conteudo": str}])
+      - referencias (List[str])
 
-    - Título centralizado
-    - Nome(s) do(s) autor(es) à direita
-    - Seções numeradas e divididas por subtítulos com espaçamento e recuo apropriado
-    - Conclusão clara, com reforço dos pontos principais e possíveis implicações
-    - Referências bibliográficas no padrão ABNT, com título da fonte, link e data de acesso
-    - Todo o conteúdo respeitando a formatação especificada: margens, fonte, espaçamento, alinhamento, recuo de parágrafo, etc.
-
-    O artigo deve ter uma leitura fluida, com linguagem técnica acessível, estrutura lógica e conteúdo coerente com o objetivo original.
+    A estrutura deve seguir as normas de formatação acadêmica descritas, porém a saída final será usada como dicionário Python.
 
   agent: reviewer
   depends_on: [reporting_task]
+
