@@ -1,6 +1,6 @@
 research_task:
   description: >
-    Realize uma pesquisa sobre o tópico fornecido utilizando a Wikipedia.
+    Realize uma pesquisa na Wikipedia sobre o seguinte tópico: "{topic}".
 
     Instruções:
     - Busque informações relevantes, atualizadas e de qualidade.
@@ -8,9 +8,10 @@ research_task:
     - O texto deve ser claro, objetivo e livre de opiniões.
     - Não inclua conteúdo especulativo ou desnecessário.
     - Mantenha a linguagem técnica acessível e precisa.
-
+  
   expected_output: >
-    Um resumo coeso de pelo menos três parágrafos sobre o tema, contendo os pontos principais da pesquisa.
+    Um resumo em formato de texto corrido com pelo menos cinco parágrafos informativos,
+    contendo dados relevantes e confiáveis sobre o tópico pesquisado, extraídos da Wikipedia.
 
   agent: researcher
 
@@ -35,29 +36,43 @@ review_task:
     Revise o artigo gerado, atentando-se aos seguintes pontos:
 
     - Ortografia, gramática e pontuação.
-    - Clareza e fluidez textual.
+    - Clareza, coesão e fluidez textual.
     - Consistência do conteúdo com o objetivo proposto.
-    - Sugestões de melhoria, se necessário.
+    - Estrutura lógica com começo, meio e fim.
+    - Sugestões de melhoria, caso necessário, com foco em legibilidade e precisão técnica.
+    - Se necessário, reescreva partes para maior coerência e completude argumentativa.
 
-    Se tudo estiver correto, apenas reescreva o texto corrigido com pequenas melhorias estilísticas.
+    Organize o conteúdo revisado no **formato de artigo textual estruturado**, obedecendo os seguintes elementos obrigatórios:
+
+    - Título centralizado (representativo e impactante)
+    - Nome(s) do(s) autor(es) alinhados à direita (Deixe o nome vazio)
+    - Seções com subtítulos à esquerda (Resumo, Introdução, Desenvolvimento, etc.)
+    - Conclusão clara e bem fundamentada
+    - Referências ao final, no padrão ABNT, com link e data de acesso
+    - Texto justificado, com recuo de parágrafo (1 TAB ou 1,25 cm)
+
+    Aplique as normas de formatação abaixo:
+
+    - Papel: A4 (branco ou reciclado)
+    - Margens: esquerda e superior de 3 cm; direita e inferior de 2 cm
+    - Fonte: Times New Roman, Arial, Calibri ou Verdana, tamanho 12
+    - Espaçamento entre linhas: 1,5 no corpo do texto; simples em citações longas, notas de rodapé e referências
+    - Tamanho da fonte 10 para: citações longas (com mais de 3 linhas), rodapés, paginação, referências e legendas
+    - Paginação: canto superior direito, em algarismos arábicos, fonte 10 (primeira página é contada, mas não numerada)
+    - Distância entre seções: uma linha em branco (espaço 1,5)
+    - Texto final deve ser justificado
 
   expected_output: >
-    Uma versão revisada e polida do artigo, pronta para publicação.
+    Um artigo **revisado e polido, pronto para publicação ou submissão institucional**, contendo:
 
-    O conteúdo final **deve estar formatado em JSON**, seguindo esta estrutura:
+    - Título centralizado
+    - Nome(s) do(s) autor(es) à direita
+    - Seções numeradas e divididas por subtítulos com espaçamento e recuo apropriado
+    - Conclusão clara, com reforço dos pontos principais e possíveis implicações
+    - Referências bibliográficas no padrão ABNT, com título da fonte, link e data de acesso
+    - Todo o conteúdo respeitando a formatação especificada: margens, fonte, espaçamento, alinhamento, recuo de parágrafo, etc.
 
-    {
-      "titulo": "Título do artigo",
-      "secoes": [
-        {"subtitulo": "Introdução", "conteudo": "Texto da introdução"},
-        {"subtitulo": "Desenvolvimento", "conteudo": "Texto do desenvolvimento"}
-      ],
-      "conclusao": "Texto da conclusão",
-      "referencias": [
-        {"titulo": "Fonte 1", "link": "https://..."},
-        {"titulo": "Fonte 2", "link": "https://..."}
-      ]
-    }
+    O artigo deve ter uma leitura fluida, com linguagem técnica acessível, estrutura lógica e conteúdo coerente com o objetivo original.
 
   agent: reviewer
   depends_on: [reporting_task]

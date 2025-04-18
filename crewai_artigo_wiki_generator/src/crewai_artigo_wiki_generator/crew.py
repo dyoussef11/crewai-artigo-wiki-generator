@@ -22,6 +22,7 @@ class CrewaiArtigoWikiGenerator():
     
     @tool
     def wikipedia_tool(self):
+        print("Initializing Wikipedia Tool")
         return WikipediaTool()
     
     @agent
@@ -43,7 +44,7 @@ class CrewaiArtigoWikiGenerator():
     def reviewer(self) -> Agent:
         return Agent(
             config=self.agents_config['reviewer'],
-            verbose=True
+            # verbose=True
         )
 
     # To learn more about structured task outputs,

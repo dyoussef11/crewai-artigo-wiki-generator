@@ -13,24 +13,36 @@ from fastapi import FastAPI
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
+
+
 # This main file is intended to be a way for you to run your
 # crew locally, so refrain from adding unnecessary logic into this file.
 # Replace with inputs you want to test with, it will automatically
 # interpolate any tasks and agents information
 
 def run():
-    """
-    Run the crew.
-    """
-    inputs = {
-        'topic': 'AI LLMs',
-        'current_year': str(datetime.now().year)
-    }
-    
-    try:
-        CrewaiArtigoWikiGenerator().crew().kickoff(inputs=inputs)
-    except Exception as e:
-        raise Exception(f"An error occurred while running the crew: {e}")
+    while True:
+        topic = input("Digite o tópico do artigo: ").strip()
+
+        if topic:
+            # Se o tópico for válido, inicia o processo
+            inputs = {
+                'topic': topic,
+                'current_year': str(datetime.now().year)
+            }
+
+            try:
+                CrewaiArtigoWikiGenerator().crew().kickoff(inputs=inputs)
+            except Exception as e:
+                raise Exception(f"An error occurred while running the crew: {e}")
+            break  # Sai do loop depois de executar com sucesso
+
+        else:
+            print("⚠️ Você deixou o campo em branco. Deseja tentar novamente?")
+            opcao = input("Digite 's' para tentar novamente ou qualquer outra tecla para sair: ").strip().lower()
+            if opcao != 's':
+                print("🚪 Processo encerrado.")
+                break  # Sai do loop e encerra o programa
 
 
 def train():
@@ -61,7 +73,7 @@ def test():
     Test the crew execution and returns the results.
     """
     inputs = {
-        "topic": "AI LLMs",
+        "topic": "Games",
         "current_year": str(datetime.now().year)
     }
     try:
