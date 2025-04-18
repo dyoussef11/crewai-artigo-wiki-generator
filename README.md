@@ -1,54 +1,201 @@
-# CrewaiArtigoWikiGenerator Crew
 
-Welcome to the CrewaiArtigoWikiGenerator Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+# 🧠 crewAI Artigo Wiki Generator
 
-## Installation
+Um sistema multiagente de geração de artigos em português baseado na Wikipedia, utilizando a poderosa orquestração da biblioteca [CrewAI](https://www.crewai.com/).  
+O projeto foi desenvolvido com foco em modularidade, automação e fácil execução, sendo ideal para estudo e demonstração de uso prático de agentes LLM em tarefas colaborativas.
 
-Ensure you have Python >=3.10 <3.13 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+---
 
-First, if you haven't already, install uv:
+## ✨ Funcionalidades
+
+- ✅ Geração de artigos em português com base em tópicos da Wikipedia
+- 🤖 Arquitetura multiagente com:
+  - **Pesquisador**: busca conteúdo
+  - **Redator**: gera os parágrafos
+  - **Revisor**: melhora e valida o texto
+- 🌐 API em Flask com endpoint simples
+- 🧠 Integração com LLMs via Groq
+- 📦 Instalação e execução automáticas por script (`.bat` ou `.sh`)
+- 📝 Retorno formatado em JSON com título, tópicos, conteúdo e referências
+
+---
+
+## 🛠️ Pré-requisitos
+
+- Python 3.10 ou superior instalado  
+- Git (opcional, mas recomendado)
+
+---
+
+## 🚀 Instalação e Execução
+
+### 🔁 Método Automático (Recomendado)
+
+#### 🪟 **Windows**
+
+1. **Clique duas vezes no `start.bat`**  
+   ou execute no terminal:
+
+   ```bash
+   start.bat
+   ```
+
+#### 🐧 **Linux / MacOS**
+
+1. Dê permissão de execução:
+
+   ```bash
+   chmod +x start.sh
+   ```
+
+2. Execute:
+
+   ```bash
+   ./start.sh
+   ```
+
+---
+
+### 🧩 O que os scripts fazem?
+
+- Criam ambiente virtual `.venv`
+- Ativam o ambiente
+- Instalam todas as dependências (`requirements.txt`)
+- Executam o `main.py` com a API Flask
+
+---
+
+### 🔧 Instalação Manual (Alternativa)
 
 ```bash
-pip install uv
-```
+# Clone o repositório (se aplicável)
+git clone https://github.com/dyoussef11/crewai-artigo-wiki-generator.git
+cd crewai-artigo-wiki-generator
 
-Next, navigate to your project directory and install the dependencies:
+# Crie e ative o ambiente virtual
+python -m venv .venv
+source .venv/bin/activate     # Linux/macOS
+.venv\Scripts\activate        # Windows
+cd crewai_artigo_wiki_generator
+# Instale as dependências
+pip install -r requirements.txt
 
-(Optional) Lock the dependencies and install them by using the CLI command:
-```bash
-crewai install
-```
-### Customizing
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
-
-- Modify `src/crewai_artigo_wiki_generator/config/agents.yaml` to define your agents
-- Modify `src/crewai_artigo_wiki_generator/config/tasks.yaml` to define your tasks
-- Modify `src/crewai_artigo_wiki_generator/crew.py` to add your own logic, tools and specific args
-- Modify `src/crewai_artigo_wiki_generator/main.py` to add custom inputs for your agents and tasks
-
-## Running the Project
-
-To kickstart your crew of AI agents and begin task execution, run this from the root folder of your project:
+### 🔧 Instalação Manual (Alternativa)
 
 ```bash
-$ crewai run
+# Clone o repositório (se aplicável)
+git clone https://github.com/dyoussef11/crewai-artigo-wiki-generator.git
+cd crewai-artigo-wiki-generator
+
+# Crie e ative o ambiente virtual
+python -m venv .venv
+source .venv/bin/activate     # Linux/macOS
+.venv\Scripts\activate        # Windows
+cd crewai_artigo_wiki_generator
+# Instale as dependências
+pip install -r requirements.txt
+
+
+# Execute o projeto
+python src/crewai_artigo_wiki_generator/main.py
 ```
 
-This command initializes the crewai-artigo-wiki-generator Crew, assembling the agents and assigning them tasks as defined in your configuration.
+---
 
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
+## 🧪 Como usar a API
 
-## Understanding Your Crew
+O servidor Flask ficará disponível em:
 
-The crewai-artigo-wiki-generator Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
+```
+http://localhost:5000
+```
 
-## Support
+### 🔍 Endpoint
 
-For support, questions, or feedback regarding the CrewaiArtigoWikiGenerator Crew or crewAI.
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
+```
+GET /generate_article
+```
 
-Let's create wonders together with the power and simplicity of crewAI.
+#### Parâmetro necessário:
+
+- `topic`: Nome do tópico desejado
+
+#### Exemplo de requisição:
+
+```
+http://localhost:5000/generate_article?topic=Inteligência%20Artificial
+```
+
+#### Resposta (JSON):
+
+```json
+{
+  "titulo": "A Ascensão da Inteligência Artificial",
+  "topico": "Inteligência Artificial",
+  "data_criacao": "2025-04-18",
+  "autor": "Agente IA",
+  "paragrafos": [
+    "Parágrafo 1...",
+    "Parágrafo 2..."
+  ],
+  "referencias": [
+    "https://pt.wikipedia.org/wiki/Intelig%C3%AAncia_artificial"
+  ]
+}
+```
+
+---
+
+## 🗂️ Estrutura do Projeto
+
+```
+crewai-artigo-wiki-generator/
+├── start.bat                      # Script de inicialização para Windows
+├── start.sh                       # Script de inicialização para Linux/macOS
+├── requirements.txt               # Dependências do projeto
+├── README.md                      # Documentação
+└── src/
+    └── crewai_artigo_wiki_generator/
+        ├── config/                # Configurações gerais
+        ├── models/                # Modelos de dados com Pydantic
+        ├── tools/                 # Ferramentas de manipulação e scraping
+        ├── crew.py                # Definição dos agentes e fluxo
+        └── main.py                # Execução da aplicação Flask
+```
+
+---
+
+## 🧰 Tecnologias Utilizadas
+
+- [Python](https://www.python.org/)
+- [CrewAI](https://github.com/joaomdmoura/crewAI)
+- [Flask](https://flask.palletsprojects.com/)
+- [spaCy](https://spacy.io/)
+- [Wikipedia API](https://pypi.org/project/wikipedia/)
+- [Pydantic](https://docs.pydantic.dev/)
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas!
+
+1. Faça um fork
+2. Crie uma branch com sua feature (`git checkout -b minha-feature`)
+3. Commit suas mudanças (`git commit -m 'feat: adiciona nova feature'`)
+4. Push para a branch (`git push origin minha-feature`)
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+---
+
+## 👨‍💻 Autor
+
+**Daniel Youssef** — [LinkedIn](https://www.linkedin.com/in/daniel-youssef-603867285/) • [GitHub](https://github.com/dyoussef11)
+

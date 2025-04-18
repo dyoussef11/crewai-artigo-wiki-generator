@@ -54,7 +54,7 @@ class CrewaiArtigoWikiGenerator():
     def reporting_task(self) -> Task:
         return Task(
             config=self.tasks_config['reporting_task'],
-            output_file='report.md'
+            output_file='artigos-gerados/Versão_preliminar.md'
         )
     
     @task
@@ -62,7 +62,7 @@ class CrewaiArtigoWikiGenerator():
         return Task(
             config=self.tasks_config['review_task'],
             output_pydantic=Artigo,
-            output_file='article_final.md'
+            output_file='artigos-gerados/Artigo_Final.md'
         )
 
     @crew
@@ -71,7 +71,7 @@ class CrewaiArtigoWikiGenerator():
         # To learn how to add knowledge sources to your crew, check out the documentation:
         # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
 
-        if not self._is_valid_topic("" or " "):  # Exemplo de condição de interrupção
+        if not self._is_valid_topic(""):  # Exemplo de condição de interrupção
             raise Exception("Tópico inválido, interrompendo o processo.")
         
         return Crew(
