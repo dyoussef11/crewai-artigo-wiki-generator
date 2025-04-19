@@ -76,7 +76,7 @@ cd crewai-artigo-wiki-generator
 python -m venv .venv
 source .venv/bin/activate     # Linux/macOS
 .venv\Scripts\activate        # Windows
-cd crewai_artigo_wiki_generator
+cd crewai_artigo_wiki_generator/src/crewai_artigo_wiki_generator
 # Instale as dependências
 pip install -r requirements.txt
 
