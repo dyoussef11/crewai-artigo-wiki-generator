@@ -62,16 +62,22 @@ review_task:
     - referencias: Lista de strings no formato ABNT com link e data de acesso.
 
   expected_output: >
-    Um dicionário com as chaves:
-      - titulo (str)
-      - topico (str)
-      - data_criacao (datetime)
-      - autor (str = "MultiAgente AI")
-      - paragrafos (List[{"titulo": str, "conteudo": str}])
-      - referencias (List[str])
-
-    A estrutura deve seguir as normas de formatação acadêmica descritas, porém a saída final será usada como dicionário Python.
-
+    expected_output: |
+    {
+        "titulo": "Artigo sobre: Inteligência Artificial",
+        "topico": "Inteligência Artificial",
+        "data_criacao": "2025-04-18T15:30:00",
+        "autor": "MultiAgente AI",
+        "paragrafos": [
+            {"titulo": "Resumo", "conteudo": "Texto do resumo..."},
+            {"titulo": "Introdução", "conteudo": "Texto da introdução..."},
+            ...
+        ],
+        "referencias": [
+            "Wikipedia. Inteligência Artificial. Acesso em 18/04/2025.",
+            "Fonte adicional. Acesso em 18/04/2025."
+        ]
+    }
   agent: reviewer
   depends_on: [reporting_task]
 

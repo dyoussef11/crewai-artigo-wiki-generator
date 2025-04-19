@@ -1,8 +1,22 @@
+from datetime import datetime
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task, tool
 from tools.wikipedia_tool import WikipediaTool
 from models.article_model import Artigo
 
+
+
+artigo_exemplo = Artigo(
+    titulo="Exemplo de Título",
+    topico="Exemplo de Tópico",
+    data_criacao=datetime.now(),
+    autor="Autor Exemplo",
+    paragrafos=[{
+        "titulo": "Introdução", 
+        "conteudo": "Este é o conteúdo da introdução do artigo."
+    }],
+    referencias=["https://exemplo.com"]
+)
 
 @CrewBase
 class CrewaiArtigoWikiGenerator:
@@ -115,7 +129,7 @@ class CrewaiArtigoWikiGenerator:
         Returns:
             Crew: A crew completa pronta para execução.
         """
-        if not self._is_valid_topic(""):
+        if self._is_valid_topic(" "):
             raise Exception("Tópico inválido, interrompendo o processo.")
 
         return Crew(

@@ -28,3 +28,4 @@ class Artigo(BaseModel):
     autor: Optional[str] = "Sistema Multiagente"
     paragrafos: List[Paragrafo]
     referencias: List[str] = []
+
