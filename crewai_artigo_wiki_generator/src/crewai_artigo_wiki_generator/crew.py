@@ -5,21 +5,36 @@ from models.article_model import Artigo
 
 
 @CrewBase
-class CrewaiArtigoWikiGenerator():
-    """CrewaiArtigoWikiGenerator crew"""
+class CrewaiArtigoWikiGenerator:
+    """
+    Classe principal que configura e executa a crew de geração de artigos a partir da Wikipedia
+    utilizando agentes definidos com CrewAI.
 
-    
+    Esta classe define os agentes, tarefas e ferramentas envolvidas no processo, com base em arquivos de configuração YAML.
+    """
+
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
 
-
     @tool
     def wikipedia_tool(self):
+        """
+        Inicializa a ferramenta personalizada de busca na Wikipedia.
+
+        Returns:
+            WikipediaTool: Instância da ferramenta personalizada.
+        """
         print("Initializing Wikipedia Tool")
         return WikipediaTool()
-    
+
     @agent
     def researcher(self) -> Agent:
+        """
+        Agente responsável por pesquisar informações no tópico desejado.
+
+        Returns:
+            Agent: Agente configurado com acesso à Wikipedia.
+        """
         return Agent(
             config=self.agents_config['researcher'],
             tools=[WikipediaTool()],
@@ -28,23 +43,38 @@ class CrewaiArtigoWikiGenerator():
 
     @agent
     def reporting_analyst(self) -> Agent:
+        """
+        Agente responsável por redigir um rascunho do artigo com base nas informações pesquisadas.
+
+        Returns:
+            Agent: Agente configurado sem ferramentas externas.
+        """
         return Agent(
             config=self.agents_config['reporting_analyst'],
             verbose=True
         )
-        
+
     @agent
     def reviewer(self) -> Agent:
+        """
+        Agente responsável por revisar o artigo preliminar e gerar o conteúdo final estruturado.
+
+        Returns:
+            Agent: Agente configurado para revisão.
+        """
         return Agent(
             config=self.agents_config['reviewer'],
             verbose=False
         )
 
-    # To learn more about structured task outputs,
-    # task dependencies, and task callbacks, check out the documentation:
-    # https://docs.crewai.com/concepts/tasks#overview-of-a-task
     @task
     def research_task(self) -> Task:
+        """
+        Tarefa de pesquisa, utilizando o WikipediaTool.
+
+        Returns:
+            Task: Tarefa configurada para pesquisa inicial.
+        """
         return Task(
             config=self.tasks_config['research_task'],
             tools=[WikipediaTool()],
@@ -52,13 +82,25 @@ class CrewaiArtigoWikiGenerator():
 
     @task
     def reporting_task(self) -> Task:
+        """
+        Tarefa de criação do rascunho do artigo.
+
+        Returns:
+            Task: Tarefa configurada com arquivo de saída preliminar.
+        """
         return Task(
             config=self.tasks_config['reporting_task'],
             output_file='artigos-gerados/Versão_preliminar.md'
         )
-    
+
     @task
     def review_task(self) -> Task:
+        """
+        Tarefa de revisão e estruturação do artigo final.
+
+        Returns:
+            Task: Tarefa configurada com modelo Pydantic e arquivo final.
+        """
         return Task(
             config=self.tasks_config['review_task'],
             output_pydantic=Artigo,
@@ -67,22 +109,31 @@ class CrewaiArtigoWikiGenerator():
 
     @crew
     def crew(self) -> Crew:
-        """Creates the CrewaiArtigoWikiGenerator crew"""
-        # To learn how to add knowledge sources to your crew, check out the documentation:
-        # https://docs.crewai.com/concepts/knowledge#what-is-knowledge
+        """
+        Instancia e retorna a crew composta pelos agentes e tarefas definidos.
 
-        if not self._is_valid_topic(""):  # Exemplo de condição de interrupção
+        Returns:
+            Crew: A crew completa pronta para execução.
+        """
+        if not self._is_valid_topic(""):
             raise Exception("Tópico inválido, interrompendo o processo.")
-        
+
         return Crew(
-            agents=self.agents, # Automatically created by the @agent decorator
-            tasks=self.tasks, # Automatically created by the @task decorator
+            agents=self.agents,
+            tasks=self.tasks,
             process=Process.sequential,
             output_pydantic=Artigo,
             verbose=True,
-            # process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
         )
-        
+
     def _is_valid_topic(self, topic: str) -> bool:
-            # Exemplo de verificação simples
-            return topic.lower() != " "
+        """
+        Verifica se o tópico fornecido é válido.
+
+        Args:
+            topic (str): Tópico a ser validado.
+
+        Returns:
+            bool: True se o tópico for válido, False caso contrário.
+        """
+        return topic.lower().strip() != ""

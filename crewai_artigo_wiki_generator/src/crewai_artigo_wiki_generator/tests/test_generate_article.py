@@ -3,6 +3,27 @@ from flask import Flask, jsonify, request
 from crewai_artigo_wiki_generator.crew import CrewaiArtigoWikiGenerator
 from unittest.mock import patch
 
+"""
+Módulo de testes para a rota /generate_article da aplicação Flask.
+
+⚠️ Atenção:
+Esses testes só funcionarão corretamente **caso os imports das classes e funções**
+(do tipo `from crewai_artigo_wiki_generator.crew import ...`) estejam corretos
+em relação à estrutura local do projeto.
+
+Se estiver rodando os testes fora do contexto de pacote (ex: execução direta),
+pode ser necessário ajustar os caminhos de import, como usar imports relativos
+ou configurar o PYTHONPATH.
+
+Exemplo de correção de import:
+De: from crewai_artigo_wiki_generator.crew import CrewaiArtigoWikiGenerator
+Para: from crew import CrewaiArtigoWikiGenerator
+"""
+
+
+
+
+
 app = Flask(__name__)
 
 @app.route('/generate_article', methods=['GET'])

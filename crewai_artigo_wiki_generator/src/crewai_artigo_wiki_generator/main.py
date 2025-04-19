@@ -1,16 +1,14 @@
-
 import sys
 from urllib import request
 import warnings
 from datetime import datetime
-# from crewai_artigo_wiki_generator.crew import CrewaiArtigoWikiGenerator
 from crew import CrewaiArtigoWikiGenerator
 from models.article_model import Artigo, Paragrafo
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from flask import Flask, request, jsonify
 import logging
-from litellm import RateLimitError 
+from litellm import RateLimitError
 
 # Configuração do log
 logging.basicConfig(level=logging.INFO)
@@ -21,20 +19,36 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 # Definir o modelo de dados para a requisição
 class ArticleRequest(BaseModel):
+    """
+    Modelo para a requisição de geração de artigo.
+
+    Atributos:
+        topic (str): Tópico do artigo a ser gerado.
+    """
     topic: str
 
+# Inicializando o aplicativo Flask
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-  # <- certifique-se que o pacote 'litellm' está instalado e importado
 
 def execute_crew_process(topic: str):
+    """
+    Função para executar o processo do CrewAI e gerar o artigo com base no tópico fornecido.
+
+    Args:
+        topic (str): Tópico do artigo a ser gerado.
+
+    Returns:
+        dict: Retorna um dicionário com os dados do artigo gerado ou um erro.
+    """
     logger.info(f"Iniciando a geração do artigo sobre o tópico: {topic}")
     
     try:
         inputs = {"topic": topic}
         response = CrewaiArtigoWikiGenerator().crew().kickoff(inputs=inputs)
 
+        # Verificação de erro caso a chave 'titulo' não esteja presente na resposta
         if "titulo" not in response:
             logger.error(f"Chave 'titulo' não encontrada na resposta do CrewAI para o tópico: {topic}")
             return {"error": "Falha ao gerar o artigo. Chave 'titulo' não encontrada."}
@@ -58,21 +72,22 @@ def execute_crew_process(topic: str):
         logger.error(f"Erro ao gerar o artigo: {e}")
         return {"error": f"Erro ao gerar o artigo: {e}"}
 
-
-
-
-
-
-
-
-
 @app.route("/generate_article", methods=["POST", "GET"])
-
 def generate_article():
+    """
+    Endpoint para gerar um artigo a partir de um tópico.
+
+    Suporta os métodos HTTP GET e POST:
+        - GET: Obtém o tópico a partir do parâmetro de consulta.
+        - POST: Recebe o JSON com o tópico para gerar o artigo.
+
+    Retorna:
+        dict: Resultado da geração do artigo ou erro.
+    """
     if request.method == "GET":
-        # Tópico passado como parâmetro de consulta na URL
         topic = request.args.get('topic', '').strip()
 
+        # Verifica se o tópico foi fornecido
         if not topic:
             return jsonify({"error": "O tópico não pode estar vazio."}), 400
 
@@ -84,10 +99,10 @@ def generate_article():
         return jsonify(artigo), 200
 
     if request.method == "POST":
-        # Caso seja um POST, recebe o JSON como entrada
         data = request.get_json()
         topic = data.get("topic", "").strip()
 
+        # Verifica se o tópico foi fornecido
         if not topic:
             return jsonify({"error": "O tópico não pode estar vazio."}), 400
 
@@ -98,12 +113,17 @@ def generate_article():
 
         return jsonify(artigo), 200
 
-
-
 @app.post("/train_crew/")
 async def train_crew(iterations: int, filename: str):
     """
-    Endpoint para treinar o CrewAI com o número de iterações e nome do arquivo fornecido.
+    Endpoint para treinar o CrewAI com o número de iterações e o nome do arquivo fornecido.
+
+    Args:
+        iterations (int): Número de iterações para o treinamento.
+        filename (str): Nome do arquivo com os dados de treinamento.
+
+    Returns:
+        dict: Mensagem de sucesso ou erro.
     """
     inputs = {
         "topic": "AI LLMs"
@@ -123,6 +143,12 @@ async def train_crew(iterations: int, filename: str):
 async def replay_task(task_id: str):
     """
     Endpoint para reproduzir a execução do CrewAI a partir de um task_id específico.
+
+    Args:
+        task_id (str): ID do task a ser reproduzido.
+
+    Returns:
+        dict: Mensagem de sucesso ou erro.
     """
     try:
         logger.info(f"Iniciando o replay do task {task_id}...")
@@ -138,6 +164,13 @@ async def replay_task(task_id: str):
 async def test_crew(iterations: int, openai_model_name: str):
     """
     Endpoint para testar a execução do CrewAI com um número específico de iterações e modelo OpenAI.
+
+    Args:
+        iterations (int): Número de iterações para o teste.
+        openai_model_name (str): Nome do modelo OpenAI a ser utilizado.
+
+    Returns:
+        dict: Mensagem de sucesso ou erro.
     """
     inputs = {
         "topic": "Games",
@@ -155,6 +188,7 @@ async def test_crew(iterations: int, openai_model_name: str):
         raise HTTPException(status_code=500, detail="Erro ao testar o CrewAI.")
 
 if __name__ == "__main__":
+    """
+    Inicia o servidor Flask na porta 5000.
+    """
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-    app.run(debug=True)
