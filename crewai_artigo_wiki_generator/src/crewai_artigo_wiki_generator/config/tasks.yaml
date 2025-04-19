@@ -71,13 +71,36 @@ review_task:
         "paragrafos": [
             {"titulo": "Resumo", "conteudo": "Texto do resumo..."},
             {"titulo": "Introdução", "conteudo": "Texto da introdução..."},
-            ...
+            {"titulo": "Desenvolvimento", "conteudo": "Texto do desenvolvimento..."},
+            {"titulo": "Conclusão", "conteudo": "Texto da conclusão..."}
         ],
         "referencias": [
             "Wikipedia. Inteligência Artificial. Acesso em 18/04/2025.",
             "Fonte adicional. Acesso em 18/04/2025."
         ]
     }
+
+  second_output:
+    description: >
+      Formato do artigo demonstrado como ficaria seguindo as normas ABNT, com um nome fictício diferente e estrutura completa de artigo. O texto será estruturado com as seções corretas de um artigo acadêmico, como se estivesse pronto para ser apresentado de acordo com as regras da ABNT.
+
+    expected_output: |
+    Artigo sobre: Inteligência Artificial
+
+    Autor: MultiAgente AI
+    Data de Criação: 18/04/2025
+
+    Resumo: Texto do resumo... (revisto conforme as observações feitas no review).
+
+    Introdução: Texto da introdução... (revisto conforme as observações feitas no review).
+
+    Desenvolvimento: Texto do desenvolvimento... (revisto conforme as observações feitas no review).
+
+    Conclusão: Texto da conclusão... (revisto conforme as observações feitas no review).
+
+    
+    Referências: WIKIPEDIA. Inteligência Artificial. Acesso em 18/04/2025. FONTE ADICIONAL. Acesso em 18/04/2025. 
+    
+    
   agent: reviewer
   depends_on: [reporting_task]
-

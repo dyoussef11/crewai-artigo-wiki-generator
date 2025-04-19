@@ -10,10 +10,22 @@ echo "📦 Instalando dependências..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
+# Solicitar o tópico do usuário
+read -p "Digite o tópico para o artigo: " TOPICO
 
+# Verificar se o tópico foi fornecido
+if [ -z "$TOPICO" ]; then
+    echo "O tópico não pode estar vazio. Encerrando o processo."
+    exit 1
+fi
 
-echo "🚀 Executando aplicação..."
-python src/crewai_artigo_wiki_generator/main.py
+# URL do servidor Flask
+URL="http://127.0.0.1:5000/generate_article?topic=$TOPICO"
 
-# Mantém o terminal aberto após execução (só necessário em alguns terminais interativos)
+echo "🌐 Enviando requisição para o servidor Flask..."
+
+# Fazer a requisição GET para o servidor Flask
+curl -X GET "$URL"
+
+# Manter o terminal aberto após execução
 $SHELL

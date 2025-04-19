@@ -1,3 +1,4 @@
+import os
 import sys
 from urllib import request
 import warnings
@@ -48,11 +49,6 @@ def execute_crew_process(topic: str):
         inputs = {"topic": topic}
         response = CrewaiArtigoWikiGenerator().crew().kickoff(inputs=inputs)
 
-        # Verificação de erro caso a chave 'titulo' não esteja presente na resposta
-        if "titulo" not in response:
-            logger.error(f"Chave 'titulo' não encontrada na resposta do CrewAI para o tópico: {topic}")
-            return {"error": "Falha ao gerar o artigo. Chave 'titulo' não encontrada."}
-
         artigo = {
             "titulo": response["titulo"],
             "topico": response.get("topico", "Informações não encontradas"),
@@ -85,7 +81,7 @@ def generate_article():
         dict: Resultado da geração do artigo ou erro.
     """
     if request.method == "GET":
-        topic = request.args.get('topic', '').strip()
+        topic = request.args.get("topic")
 
         # Verifica se o tópico foi fornecido
         if not topic:
@@ -98,20 +94,7 @@ def generate_article():
 
         return jsonify(artigo), 200
 
-    if request.method == "POST":
-        data = request.get_json()
-        topic = data.get("topic", "").strip()
 
-        # Verifica se o tópico foi fornecido
-        if not topic:
-            return jsonify({"error": "O tópico não pode estar vazio."}), 400
-
-        artigo = execute_crew_process(topic)
-
-        if "error" in artigo:
-            return jsonify(artigo), 500
-
-        return jsonify(artigo), 200
 
 @app.post("/train_crew/")
 async def train_crew(iterations: int, filename: str):
@@ -191,4 +174,16 @@ if __name__ == "__main__":
     """
     Inicia o servidor Flask na porta 5000.
     """
+    initial_topic = None
+    if len(sys.argv) > 1:
+        initial_topic = sys.argv[1]
+        logger.info(f"Tópico inicial recebido via linha de comando: {initial_topic}")
+        # You could potentially trigger the article generation here
+        # or store this topic to be used when the /generate_article
+        # endpoint is accessed.
+        execute_crew_process(initial_topic)
+        
+        
+    
     app.run(host="0.0.0.0", port=5000, debug=True)
+    

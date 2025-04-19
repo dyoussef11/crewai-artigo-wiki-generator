@@ -4,20 +4,6 @@ from crewai.project import CrewBase, agent, crew, task, tool
 from tools.wikipedia_tool import WikipediaTool
 from models.article_model import Artigo
 
-
-
-artigo_exemplo = Artigo(
-    titulo="Exemplo de Título",
-    topico="Exemplo de Tópico",
-    data_criacao=datetime.now(),
-    autor="Autor Exemplo",
-    paragrafos=[{
-        "titulo": "Introdução", 
-        "conteudo": "Este é o conteúdo da introdução do artigo."
-    }],
-    referencias=["https://exemplo.com"]
-)
-
 @CrewBase
 class CrewaiArtigoWikiGenerator:
     """
@@ -118,7 +104,8 @@ class CrewaiArtigoWikiGenerator:
         return Task(
             config=self.tasks_config['review_task'],
             output_pydantic=Artigo,
-            output_file='artigos-gerados/Artigo_Final.md'
+            output_file='artigos-gerados/Artigo_Final.md',
+            additional_output_file='artigos-gerados/Artigo_ABNT.md'
         )
 
     @crew
