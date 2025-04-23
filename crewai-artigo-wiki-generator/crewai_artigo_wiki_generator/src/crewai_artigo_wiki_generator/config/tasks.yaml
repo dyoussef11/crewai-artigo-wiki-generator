@@ -1,0 +1,106 @@
+research_task:
+  description: >
+    Realize uma pesquisa na Wikipedia sobre o seguinte tópico: "{topic}".
+
+    Instruções:
+    - Use exclusivamente a ferramenta `wikipedia_tool` para obter as informações.
+    - Não invente dados, apenas sintetize o conteúdo obtido da Wikipedia.
+    - Organize a resposta em pelo menos 5 parágrafos coesos e informativos.
+    - O texto deve ser claro, objetivo, técnico e acessível, livre de opiniões e especulações.
+    - Não inclua repetições ou frases genéricas.
+  
+  expected_output: >
+    Um texto corrido e coeso com pelo menos cinco parágrafos informativos e relevantes,
+    exclusivamente baseado no conteúdo extraído da Wikipedia através da ferramenta `wikipedia_tool`.
+
+  agent: researcher
+
+reporting_task:
+  description: >
+    Com base EXCLUSIVA no conteúdo gerado pelo pesquisador, escreva um artigo informativo com as seguintes características:
+
+    - Mínimo de 300 palavras.
+    - Estrutura com título, introdução, desenvolvimento e conclusão.
+    - Texto em português formal, fluente e coeso.
+    - Não acrescente informações novas nem inventadas: use apenas o conteúdo da etapa anterior.
+    - NÃO mencione que o texto foi gerado por IA ou retirado da Wikipedia.
+    - Sempre que possível, destaque a relevância ou impacto do tema.
+  
+  expected_output: >
+    Um artigo completo, com no mínimo 300 palavras, estruturado em parágrafos lógicos e coesos,
+    totalmente baseado no conteúdo entregue pelo pesquisador, sem extrapolar as informações fornecidas.
+  
+  agent: reporting_analyst
+  depends_on: [research_task]
+
+  # A etapa abaixo pode ajudar a definir o título se não for retornado explicitamente
+  pre_process: |
+    if "titulo" not in article:
+        article["titulo"] = "Artigo sobre: " + topic
+
+
+
+review_task:
+  description: >
+    Revise o artigo gerado, atentando-se aos seguintes pontos:
+
+    - Ortografia, gramática, pontuação e estilo.
+    - Clareza, coesão e fluidez textual.
+    - Consistência com o conteúdo original fornecido.
+    - Estrutura lógica: introdução, desenvolvimento e conclusão.
+    - Sugira melhorias e reescreva trechos para maior precisão e legibilidade, se necessário.
+
+    O resultado da revisão deve estar estruturado como um dicionário com os seguintes campos:
+
+    - titulo: Título centralizado do artigo.
+    - topico: Tópico original do artigo (mantenha o mesmo do input).
+    - data_criacao: Data de criação ou revisão do artigo (use datetime atual).
+    - autor: Fixe como "MultiAgente AI".
+    - paragrafos: Lista de dicionários com as seções do artigo. Cada item deve ter:
+      - titulo: Um dos títulos: "Resumo", "Introdução", "Desenvolvimento", "Conclusão".
+      - conteudo: Texto da seção, revisado e justificado com recuo de parágrafo.
+    - referencias: Lista de strings no formato ABNT com link e data de acesso.
+
+  expected_output: >
+    expected_output: |
+    {
+        "titulo": "Artigo sobre: Inteligência Artificial",
+        "topico": "Inteligência Artificial",
+        "data_criacao": "2025-04-18T15:30:00",
+        "autor": "MultiAgente AI",
+        "paragrafos": [
+            {"titulo": "Resumo", "conteudo": "Texto do resumo..."},
+            {"titulo": "Introdução", "conteudo": "Texto da introdução..."},
+            {"titulo": "Desenvolvimento", "conteudo": "Texto do desenvolvimento..."},
+            {"titulo": "Conclusão", "conteudo": "Texto da conclusão..."}
+        ],
+        "referencias": [
+            "Wikipedia. Inteligência Artificial. Acesso em 18/04/2025.",
+            "Fonte adicional. Acesso em 18/04/2025."
+        ]
+    }
+
+  second_output:
+    description: >
+      Formato do artigo demonstrado como ficaria seguindo as normas ABNT, com um nome fictício diferente e estrutura completa de artigo. O texto será estruturado com as seções corretas de um artigo acadêmico, como se estivesse pronto para ser apresentado de acordo com as regras da ABNT.
+
+    expected_output: |
+    Artigo sobre: Inteligência Artificial
+
+    Autor: MultiAgente AI
+    Data de Criação: 18/04/2025
+
+    Resumo: Texto do resumo... (revisto conforme as observações feitas no review).
+
+    Introdução: Texto da introdução... (revisto conforme as observações feitas no review).
+
+    Desenvolvimento: Texto do desenvolvimento... (revisto conforme as observações feitas no review).
+
+    Conclusão: Texto da conclusão... (revisto conforme as observações feitas no review).
+
+    
+    Referências: WIKIPEDIA. Inteligência Artificial. Acesso em 18/04/2025. FONTE ADICIONAL. Acesso em 18/04/2025. 
+    
+    
+  agent: reviewer
+  depends_on: [reporting_task]
