@@ -1,9 +1,11 @@
 from crewai.tools import BaseTool
 import requests
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 import logging
 from urllib.parse import quote
 import re
+import time
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -11,130 +13,265 @@ class WikipediaToolSchema(BaseModel):
     """
     Schema for Wikipedia search tool input validation
     """
-    query: str = Field(..., 
-                     description="Search term for Wikipedia in Portuguese",
+    query: str = Field(...,
+                     description="Termo de pesquisa na Wikipedia em português",
                      min_length=2,
-                     max_length=100)
+                     max_length=100,
+                     examples=["Inteligência Artificial", "História do Brasil"])
 
 class WikipediaTool(BaseTool):
     """
-    Enhanced Wikipedia search tool for Portuguese content with:
-    - Better query normalization
-    - Improved error handling
-    - Response formatting
-    - Smart caching
+    Ferramenta avançada de pesquisa na Wikipedia em português com:
+    - Sistema de tentativas com backoff exponencial
+    - Normalização inteligente de consultas
+    - Cache otimizado
+    - Tratamento robusto de erros
+    - Variações automáticas de termos
     """
     name: str = "wikipedia_tool"
     description: str = (
-        "Ferramenta de pesquisa na Wikipedia em português. "
-        "Fornece resumos concisos de tópicos. "
-        "Use para pesquisas precisas e confiáveis."
+        "Ferramenta especializada para pesquisa na Wikipedia em português. "
+        "Fornece resumos concisos e confiáveis, com tratamento especial para "
+        "termos técnicos e históricos."
     )
     
-    # Enhanced cache with expiration
-    _cache: dict = {}
-    _MAX_CACHE_SIZE = 100
+    # Configurações avançadas
+    _cache: Dict[str, str] = {}
+    _MAX_CACHE_SIZE = 200
+    _MAX_RETRIES = 20
+    _INITIAL_TIMEOUT = 5
+    _USER_AGENT = "CrewAI-ResearchBot/2.0 (https://github.com/org/repo; contact@email.com)"
     
     def _normalize_query(self, query: str) -> str:
-        """Normalize search query for Wikipedia API"""
-        # Remove extra whitespace and special characters
-        query = re.sub(r'\s+', ' ', query).strip()
-        # Capitalize first letter of each word for better matching
-        return ' '.join(word.capitalize() for word in query.split())
-    
-    def _clean_response(self, text: str) -> str:
-        """Clean and format Wikipedia response"""
-        if not text:
-            return text
-            
-        # Remove citation markers like [1], [2]
-        text = re.sub(r'\[\d+\]', '', text)
-        # Remove section headers
-        text = re.sub(r'==.*?==+', '', text)
-        # Normalize whitespace
-        return re.sub(r'\s+', ' ', text).strip()
-    
-    def _run(self, query: str) -> str:
-        """
-        Execute Wikipedia search with enhanced reliability
+        """Normaliza a consulta para melhor correspondência na Wikipedia"""
+        # Decodifica primeiro se vier codificado
+        if '%' in query:
+            from urllib.parse import unquote
+            query = unquote(query)
         
-        Args:
-            query: Search term (2-100 characters)
+        # Remove caracteres especiais e normaliza espaços
+        query = re.sub(r'[^\w\sáéíóúâêîôûãõç-]', '', query, flags=re.IGNORECASE)
+        query = re.sub(r'\s+', ' ', query).strip()
+        
+        return query.title()
+
+    def _make_api_request(self, query: str) -> Optional[Dict]:
+        """Faz requisição à API da Wikipedia com tratamento de erros"""
+        encoded_query = quote(query)
+        url = (
+            "https://pt.wikipedia.org/w/api.php?"
+            "action=query&"
+            "prop=extracts&"
+            "exlimit=1&"
+            "exchars=1500&"  # Aumentado para mais conteúdo
+            "explaintext=1&"
+            "exintro=1&"
+            f"titles={encoded_query}&"
+            "format=json&"
+            "utf8=1&"
+            "redirects=1"
+        )
+        
+        for attempt in range(self._MAX_RETRIES):
+            try:
+                timeout = self._INITIAL_TIMEOUT * (attempt + 1)
+                response = requests.get(
+                    url,
+                    timeout=timeout,
+                    headers={'User-Agent': self._USER_AGENT}
+                )
+                response.raise_for_status()
+                return response.json()
+                
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Tentativa {attempt + 1} falhou para '{query}': {str(e)}")
+                if attempt < self._MAX_RETRIES - 1:
+                    time.sleep(1 * (attempt + 1))  # Backoff exponencial
+                continue
+                
+        return None
+
+    def _try_variations(self, original_query: str) -> str:
+        """Tenta variações alternativas para a consulta"""
+        variations = [
+            original_query,
+            f"História {original_query}",
+            f"Evolução {original_query}",
+            original_query.replace("Video Game", "Videogame"),
+            original_query.replace("Games", "Jogos"),
+            original_query + " (informática)",
+            original_query + " (tecnologia)"
+        ]
+        
+        for query in variations:
+            result = self._search_wikipedia(query)
+            if "não encontrada" not in result.lower() and "não disponível" not in result.lower():
+                return result
+                
+        return f"Nenhum resultado encontrado para '{original_query}' ou variações relacionadas"
+
+    def _search_wikipedia(self, query: str) -> str:
+        """Executa a pesquisa na Wikipedia e processa os resultados"""
+        data = self._make_api_request(query)
+        if not data:
+            return "Erro ao conectar com a Wikipedia. Tente novamente mais tarde."
             
-        Returns:
-            Cleaned content or error message
-        """
+        pages = data.get("query", {}).get("pages", {})
+        if not pages:
+            return f"Nenhum resultado encontrado para: {query}"
+            
+        page = next(iter(pages.values()))
+        if "missing" in page:
+            return f"Página não encontrada para: {query}"
+            
+        text = page.get("extract", "")
+        if not text:
+            return f"Conteúdo não disponível para: {query}"
+            
+        # Limpeza do texto
+        text = re.sub(r'\[\d+\]', '', text)  # Remove citações [1], [2], etc.
+        text = re.sub(r'\n{3,}', '\n\n', text)  # Normaliza quebras de linha
+        return text.strip()
+
+    def _get_search_fallbacks(self, query: str) -> list:
+        """Gera uma sequência hierárquica de estratégias de fallback"""
+        strategies = [
+            # 1. Tentar o termo exato (já normalizado)
+            lambda q: [q],
+            
+            # 2. Variações linguísticas
+            lambda q: [
+                q,
+                q.lower(),
+                q.title(),
+                q.capitalize(),
+                re.sub(r'(?i)(?:ões|ães|ais|res|ns)$', '', q),  # singular
+                re.sub(r'(?i)([^s])$', r'\1s', q),  # plural
+            ],
+            
+            # 3. Redirecionamentos conhecidos
+            lambda q: [
+                f"História de {q}",
+                f"Evolução de {q}",
+                f"Introdução a {q}",
+                f"O que é {q}",
+                f"{q} (desambiguação)",
+                f"Categoria:{q}"
+            ],
+            
+            # 4. Busca por prefixos/sufixos comuns
+            lambda q: [
+                f"Teoria de {q}",
+                f"Filosofia de {q}",
+                f"Ciência de {q}",
+                f"Tecnologia de {q}",
+                f"{q} no Brasil",
+                f"{q} em Portugal"
+            ],
+            
+            # 5. Busca fonética aproximada (sem acentos)
+            lambda q: [''.join(
+                {'á':'a','é':'e','í':'i','ó':'o','ú':'u',
+                 'â':'a','ê':'e','î':'i','ô':'o','û':'u',
+                 'ã':'a','õ':'o','ç':'c'}.get(c, c) for c in q
+            )]
+        ]
+        
+        # Gera todas as variações sem duplicatas
+        variations = []
+        seen = set()
+        for strategy in strategies:
+            for variation in strategy(query):
+                if variation not in seen:
+                    seen.add(variation)
+                    variations.append(variation)
+        
+        return variations
+
+    def _search_with_fallbacks(self, query: str) -> str:
+        """Executa a pesquisa com todas as estratégias de fallback"""
+        # 1. Primeiro tenta a pesquisa direta
+        result = self._search_wikipedia(query)
+        if self._is_valid_result(result):
+            return result
+        
+        # 2. Obtém todas as variações possíveis
+        fallbacks = self._get_search_fallbacks(query)
+        
+        # 3. Tenta cada variação com timeout progressivo
+        for i, variation in enumerate(fallbacks[:20]):  # Limita a 20 tentativas
+            try:
+                result = self._search_wikipedia(variation)
+                if self._is_valid_result(result):
+                    # Adiciona contexto sobre o redirecionamento
+                    if variation != query:
+                        result = f"(Redirecionado de '{query}' para '{variation}')\n\n{result}"
+                    return result
+            except Exception as e:
+                logger.warning(f"Falha na variação {variation}: {str(e)}")
+                continue
+        
+        # 4. Como último recurso, tenta a API de busca
+        return self._try_search_api(query)
+
+    def _is_valid_result(self, result: str) -> bool:
+        """Verifica se o resultado é válido (não é mensagem de erro)"""
+        invalid_phrases = [
+            "não encontrada",
+            "não disponível",
+            "sem conteúdo",
+            "página inexistente",
+            "invalid title"
+        ]
+        return not any(phrase in result.lower() for phrase in invalid_phrases)
+
+    def _try_search_api(self, query: str) -> str:
+        """Usa a API de busca quando não encontra por título exato"""
+        search_url = (
+            "https://pt.wikipedia.org/w/api.php?"
+            "action=query&"
+            "list=search&"
+            "srlimit=3&"
+            "srprop=size&"
+            f"srsearch={quote(query)}&"
+            "format=json"
+        )
+        
         try:
-            # Validate and normalize input
+            response = requests.get(search_url, timeout=10)
+            data = response.json()
+            if 'query' in data and data['query']['search']:
+                top_results = [item['title'] for item in data['query']['search'][:3]]
+                return (
+                    f"Não encontrado exatamente '{query}', mas talvez queira:\n" +
+                    "\n".join(f"- {title}" for title in top_results)
+                )
+            return f"Nenhum resultado encontrado para '{query}'"
+        except Exception:
+            return f"Falha ao buscar alternativas para '{query}'"
+
+    def _run(self, query: str) -> str:
+        """Método principal com a nova abordagem generalista"""
+        try:
             validated = WikipediaToolSchema(query=query)
             clean_query = self._normalize_query(validated.query)
             
-            # Check cache first
+            # Verifica cache
             if clean_query in self._cache:
-                logger.debug(f"Cache hit for: {clean_query}")
                 return self._cache[clean_query]
-                
-            # Prepare API request
-            encoded_query = quote(clean_query)
-            url = (
-                "https://pt.wikipedia.org/w/api.php?"
-                "action=query&"
-                "prop=extracts&"
-                "exlimit=1&"
-                "exchars=1000&"
-                "explaintext=1&"
-                "exintro=1&"  # Get only the introduction
-                f"titles={encoded_query}&"
-                "format=json&"
-                "utf8=1&"
-                "redirects=1"
-            )
             
-            logger.info(f"Searching Wikipedia for: {clean_query}")
+            # Executa a pesquisa com fallbacks
+            result = self._search_with_fallbacks(clean_query)
             
-            # Make request with timeout and retry
-            try:
-                response = requests.get(
-                    url,
-                    timeout=10,
-                    headers={'User-Agent': 'CrewAI WikipediaTool/1.0'}
-                )
-                response.raise_for_status()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Wikipedia API request failed: {e}")
-                return "Erro temporário ao acessar a Wikipedia. Tente novamente."
-            
-            data = response.json()
-            pages = data.get("query", {}).get("pages", {})
-            
-            if not pages:
-                logger.warning(f"No results found for: {clean_query}")
-                return "Nenhum resultado encontrado para este tópico."
-            
-            # Get first page (Wikipedia API returns a dict with page IDs as keys)
-            page = next(iter(pages.values()))
-            
-            if "missing" in page:
-                logger.warning(f"Page not found: {clean_query}")
-                return "Página não encontrada na Wikipedia."
-                
-            text = page.get("extract", "")
-            cleaned_text = self._clean_response(text)
-            
-            if not cleaned_text:
-                logger.warning(f"Empty content for: {clean_query}")
-                return "Conteúdo não disponível para este tópico."
-            
-            # Update cache
+            # Atualiza cache
             if len(self._cache) >= self._MAX_CACHE_SIZE:
-                self._cache.popitem()
-            self._cache[clean_query] = cleaned_text
+                self._cache.pop(next(iter(self._cache)))
+            self._cache[clean_query] = result
             
-            return cleaned_text
+            return result
             
-        except ValidationError as ve:
-            logger.error(f"Invalid query: {query} - {ve}")
-            return "Termo de pesquisa inválido. Use 2 a 100 caracteres."
+        except ValidationError:
+            return "Termo de pesquisa inválido (2-100 caracteres)"
         except Exception as e:
-            logger.exception(f"Unexpected error processing: {query}")
-            return "Erro inesperado ao processar sua pesquisa."
+            logger.exception("Erro inesperado")
+            return f"Erro durante a pesquisa: {str(e)}"

@@ -1,12 +1,15 @@
 import json
 import logging
 from datetime import datetime
+import traceback
 from typing import Dict, Any
-from flask import Flask, request, jsonify
+from urllib.parse import unquote
+from flask import request, jsonify
+from flask import Flask
 from pydantic import ValidationError
 from crewai import Crew
 from crewai.task import TaskOutput
-from models.article_model import Artigo  # Your Pydantic model
+from models.article_model import Artigo # Your Pydantic model
 from crew import CrewaiArtigoWikiGenerator
 
 # Configure logging
@@ -48,40 +51,75 @@ def normalize_output(output: Any) -> Dict[str, Any]:
 
 def validate_article_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and complete article data structure"""
-    required_fields = {
-        "titulo": "Sem Título",
-        "topico": "Tópico Desconhecido",
-        "paragrafos": []
-    }
+    try:
+        # Handle raw string if present
+        if 'raw' in data and data['raw']:
+            try:
+                # Clean and parse the raw JSON
+                raw_str = data['raw'].strip()
+                
+                # Remove potential JSON code block markers
+                if raw_str.startswith('```json') and raw_str.endswith('```'):
+                    raw_str = raw_str[7:-3].strip()
+                
+                # Parse the JSON
+                parsed_data = json.loads(raw_str)
+                
+                # Merge with existing data (raw takes precedence)
+                data = {**data, **parsed_data}
+                
+                # Remove the raw field as it's no longer needed
+                data.pop('raw', None)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse raw JSON: {e}")
+                # If raw is invalid but we have other data, continue
+                if not all(k in data for k in ['titulo', 'topico', 'paragrafos']):
+                    raise ValueError("Invalid raw JSON and missing required fields")
+
+        # Ensure required fields with defaults
+        defaults = {
+            "titulo": "Sem Título",
+            "topico": "Tópico Desconhecido",
+            "paragrafos": [],
+            "data_criacao": datetime.now().isoformat(),
+            "autor": "Artigo Multiagente IA",
+            "referencias": []
+        }
+
+        # Merge provided data with defaults
+        merged_data = {**defaults, **data}
+
+        # Convert paragraphs to dict if they're Pydantic models
+        if isinstance(merged_data["paragrafos"], list):
+            merged_data["paragrafos"] = [
+                p.model_dump() if hasattr(p, 'model_dump') else 
+                p.dict() if hasattr(p, 'dict') else p
+                for p in merged_data["paragrafos"]
+            ]
+
+        # Validate using Pydantic model
+        artigo = Artigo(**merged_data)
+        
+        return artigo.model_dump()
     
-    # Ensure all required fields exist with defaults
-    for field, default in required_fields.items():
-        data[field.lower()] = data.get(field.lower(), data.get(field, default))
-    
-    # Convert paragraphs if they're Pydantic models
-    if isinstance(data["paragrafos"], list):
-        data["paragrafos"] = [
-            p.model_dump() if hasattr(p, 'model_dump') else 
-            p.dict() if hasattr(p, 'dict') else p
-            for p in data["paragrafos"]
-        ]
-    
-    # Add metadata fields with defaults
-    data["data_criacao"] = data.get("data_criacao", datetime.now().strftime("%Y-%m-%d"))
-    data["autor"] = data.get("autor", "Artigo Multiagente IA")
-    data["referencias"] = data.get("referencias", [])
-    
-    return data
+    except ValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise ValueError(f"Invalid article data structure: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected validation error: {e}")
+        raise ValueError(f"Article validation failed: {e}")
 
 def execute_crew_process(topic: str) -> Dict[str, Any]:
     """Execute the CrewAI process with robust error handling"""
     try:
         logger.info(f"Starting article generation for: {topic}")
         
+        
         # Initialize and execute crew
         result = CrewaiArtigoWikiGenerator().crew().kickoff(inputs={"topic": topic})
         
         # Normalize and validate output
+        print(result)
         normalized = normalize_output(result)
         validated = validate_article_data(normalized)
         
@@ -96,25 +134,24 @@ def execute_crew_process(topic: str) -> Dict[str, Any]:
 
 @app.route("/generate_article", methods=["GET"])
 def generate_article():
-    """Endpoint to generate Wikipedia-style articles"""
     try:
-        # Get and validate topic
-        topic = request.args.get("topic", "").strip()
+        topic = request.args.get('topic', '').strip()
         if not topic:
-            return jsonify({"error": "Topic cannot be empty"}), 400
+            return jsonify({"error": "O parâmetro 'topic' é obrigatório"}), 400
         
-        # Execute process
+        # Initialize the generator
         result = execute_crew_process(topic)
         
-        # Handle errors
-        if "error" in result:
-            return jsonify(result), 500
+        return jsonify(result)
         
-        return jsonify(result), 200
-    
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
-        logger.error(f"Endpoint error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+        traceback.print_exc()
+        return jsonify({"error": f"Erro interno: {str(e)}"}), 500
+
+
+
 
 @app.after_request
 def add_headers(response):

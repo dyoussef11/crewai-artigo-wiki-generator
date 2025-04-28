@@ -5,12 +5,12 @@ research_task:
     Instruções:
     - Use exclusivamente a ferramenta `wikipedia_tool` para obter as informações.
     - Não invente dados, apenas sintetize o conteúdo obtido da Wikipedia.
-    - Organize a resposta em pelo menos 5 parágrafos coesos e informativos.
+    - Organize a resposta em pelo menos 10 parágrafos coesos e informativos.
     - O texto deve ser claro, objetivo, técnico e acessível, livre de opiniões e especulações.
     - Não inclua repetições ou frases genéricas.
   
   expected_output: >
-    Um texto corrido e coeso com pelo menos cinco parágrafos informativos e relevantes,
+    Um texto corrido e coeso com pelo menos dez parágrafos informativos e relevantes,
     exclusivamente baseado no conteúdo extraído da Wikipedia através da ferramenta `wikipedia_tool`.
 
   agent: researcher
@@ -42,7 +42,7 @@ reporting_task:
 
 review_task:
   description: >
-    Revise o artigo gerado, atentando-se aos seguintes pontos:
+    Revise o artigo gerado, atentando-se aos seguintes pontos (se mantendo naquelas quantidade minima de 300 palavras):
 
     - Ortografia, gramática, pontuação e estilo.
     - Clareza, coesão e fluidez textual.

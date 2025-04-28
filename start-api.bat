@@ -38,19 +38,40 @@ call .venv\Scripts\activate || (
 :: Instalação de dependências (mantida igual)
 if exist "requirements.txt" (
     echo %GREEN%Installing dependencies...%RESET%
-    pip install --upgrade pip && pip install -r requirements.txt || (
+    pip install -r requirements.txt || (
         echo %RED%Failed to install dependencies%RESET%
         pause
         exit /b 1
     )
 )
 
-:: Obter tópico do usuário (mantido igual)
 :GET_TOPIC
 echo.
 set /p "TOPIC=Digite o tópico para o artigo: "
-if "!TOPIC!"=="" (
-    echo %RED%O tópico não pode estar vazio!%RESET%
+python -c "import sys; t=sys.argv[1].strip(); exit(1) if not t or len(t)<3 or t.isdigit() or all(not c.isalnum() for c in t) else exit(0)" "!TOPIC!" || (
+    echo %RED%Tópico inválido! Por favor, insira um tópico significativo.%RESET%
+    goto GET_TOPIC
+)
+
+
+
+
+:: Normalizar o tópico para URL e nome de arquivo
+echo %YELLOW%Normalizando tópico...%RESET%
+set "ENCODED_TOPIC="
+set "CLEAN_FILENAME="
+
+:: Usar Python para processamento mais robusto
+for /f "tokens=*" %%i in ('python -c "import urllib.parse, re; topic=r'!TOPIC!'; encoded=urllib.parse.quote(topic); clean=re.sub(r'[^\w\-_]', '_', topic); print(f'{encoded}|{clean[:50]}')"') do (
+    for /f "tokens=1,2 delims=|" %%a in ("%%i") do (
+        set "ENCODED_TOPIC=%%a"
+        set "CLEAN_FILENAME=%%b"
+    )
+)
+
+:: Verificar se a normalização funcionou
+if "!ENCODED_TOPIC!"=="" (
+    echo %RED%Falha ao normalizar o tópico!%RESET%
     goto GET_TOPIC
 )
 
@@ -70,80 +91,39 @@ set "CLEAN_TOPIC=!CLEAN_TOPIC:?=!"
 set "CLEAN_TOPIC=!CLEAN_TOPIC:&=!"
 set "BASE_FILENAME=artigo_!CLEAN_TOPIC:~0,50!"
 
-:: Fazer requisição e salvar JSON
 echo %GREEN%Gerando artigo...%RESET%
-curl -X GET "http://127.0.0.1:5000/generate_article?topic=!TOPIC!" ^
+
+:: Mostrar o comando curl que será executado
+echo Comando curl que será executado:
+echo curl -X GET "http://127.0.0.1:5000/generate_article?topic=!ENCODED_TOPIC!" ^
      -H "Accept: application/json; charset=utf-8" ^
-     -o "!BASE_FILENAME!.json" || (
+     -o "artigos-gerados-exemplo/!BASE_FILENAME!.json"
+echo.
+
+:: Executar o comando curl
+curl -X GET "http://127.0.0.1:5000/generate_article?topic=!ENCODED_TOPIC!" ^
+     -H "Accept: application/json; charset=utf-8" ^
+     -o "artigos-gerados-exemplo/json/!BASE_FILENAME!.json" || (
     echo %RED%Falha ao gerar artigo%RESET%
     pause
     exit /b 1
 )
 
 :: Verificar se o JSON foi criado
-if not exist "!BASE_FILENAME!.json" (
+if not exist "artigos-gerados-exemplo/json/!BASE_FILENAME!.json" (
     echo %RED%Arquivo JSON não foi criado corretamente%RESET%
     pause
     exit /b 1
 )
 
-:: Criar script Python temporário para conversão
-set "PY_SCRIPT=temp_md_converter.py"
-(
-echo import json
-echo import sys
-echo 
-echo try:
-echo     with open('!BASE_FILENAME!.json', 'r', encoding='utf-8') as f:
-echo         data = json.load(f)
-echo     
-echo     md_content = f'# {data.get("titulo", "Artigo")}\n\n'
-echo     md_content += f'**Tópico:** {data.get("topico", "")}\n'
-echo     md_content += f'**Data de criação:** {data.get("data_criacao", "")}\n'
-echo     md_content += f'**Autor:** {data.get("autor", "")}\n\n'
-echo     
-echo     for p in data.get("paragrafos", []):
-echo         md_content += f'## {p.get("titulo", "")}\n\n{p.get("conteudo", "")}\n\n'
-echo     
-echo     md_content += '## Referências\n\n'
-echo     for ref in data.get("referencias", []):
-echo         md_content += f'- {ref}\n'
-echo     
-echo     with open('!BASE_FILENAME!.md', 'w', encoding='utf-8') as f:
-echo         f.write(md_content)
-echo     print("Arquivo Markdown criado com sucesso")
-echo except Exception as e:
-echo     print(f"Erro ao converter para Markdown: {str(e)}")
-echo     sys.exit(1)
-) > "!PY_SCRIPT!"
 
-:: Executar conversão
-echo %YELLOW%Convertendo para Markdown...%RESET%
-python "!PY_SCRIPT!" || (
-    echo %RED%Falha na conversão para Markdown%RESET%
-    del "!PY_SCRIPT!"
-    pause
-    exit /b 1
-)
 
-:: Limpar script temporário
-del "!PY_SCRIPT!"
 
-:: Verificar se o MD foi criado
-if not exist "!BASE_FILENAME!.md" (
-    echo %RED%Arquivo Markdown não foi criado%RESET%
-    pause
-    exit /b 1
-)
-
-echo %GREEN%Artigo gerado com sucesso!%RESET%
-echo %YELLOW%Arquivos salvos como:
-echo - !BASE_FILENAME!.json (dados estruturados)
-echo - !BASE_FILENAME!.md (formato Markdown)%RESET%
+echo - artigos-gerados-exemplo/json/!BASE_FILENAME!.json (dados estruturados)
 
 :: Abrir ambos arquivos
-start "" "!BASE_FILENAME!.json"
-start "" "!BASE_FILENAME!.md"
+start "" "artigos-gerados-exemplo/json/!BASE_FILENAME!.json"
+
 
 echo.
 pause
