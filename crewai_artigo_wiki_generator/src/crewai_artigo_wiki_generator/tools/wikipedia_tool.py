@@ -1,23 +1,28 @@
 from crewai.tools import BaseTool
 import requests
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 import logging
 from urllib.parse import quote
 import re
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 
 logger = logging.getLogger(__name__)
 
 class WikipediaToolSchema(BaseModel):
-    """
-    Schema for Wikipedia search tool input validation
-    """
-    query: str = Field(...,
-                     description="Termo de pesquisa na Wikipedia em português",
-                     min_length=2,
-                     max_length=100,
-                     examples=["Inteligência Artificial", "História do Brasil"])
+    query: str = Field(..., min_length=2, max_length=100, 
+                      description="Termo de pesquisa para a Wikipedia")
+    
+    @field_validator('query', mode='before')
+    def extract_query_from_dict(cls, v: Union[str, dict]) -> str:
+        """Extract query from either string or dict input"""
+        if isinstance(v, dict):
+            if 'query' in v:
+                return v['query']
+            elif 'description' in v:
+                return v['description']
+            raise ValueError("Input dict must contain 'query' or 'description'")
+        return v
 
 class WikipediaTool(BaseTool):
     """
@@ -45,6 +50,7 @@ class WikipediaTool(BaseTool):
     def _normalize_query(self, query: str) -> str:
         """Normaliza a consulta para melhor correspondência na Wikipedia"""
         # Decodifica primeiro se vier codificado
+        print(query)
         if '%' in query:
             from urllib.parse import unquote
             query = unquote(query)
@@ -231,7 +237,7 @@ class WikipediaTool(BaseTool):
             "https://pt.wikipedia.org/w/api.php?"
             "action=query&"
             "list=search&"
-            "srlimit=3&"
+            "srlimit=5&"
             "srprop=size&"
             f"srsearch={quote(query)}&"
             "format=json"
@@ -250,12 +256,20 @@ class WikipediaTool(BaseTool):
         except Exception:
             return f"Falha ao buscar alternativas para '{query}'"
 
-    def _run(self, query: str) -> str:
-        """Método principal com a nova abordagem generalista"""
+    def _run(self, query: Union[str, dict]) -> str:
+        """Método principal que aceita múltiplos formatos de entrada"""
         try:
-            validated = WikipediaToolSchema(query=query)
-            clean_query = self._normalize_query(validated.query)
-            
+            # Handle both string and dict inputs
+            if isinstance(query, dict):
+                if 'query' in query:
+                    clean_query = self._normalize_query(query['query'])
+                elif 'description' in query:
+                    clean_query = self._normalize_query(query['description'])
+                else:
+                    return "Formato de entrada inválido - deve conter 'query' ou 'description'"
+            else:
+                clean_query = self._normalize_query(query)
+                
             # Verifica cache
             if clean_query in self._cache:
                 return self._cache[clean_query]
@@ -270,8 +284,6 @@ class WikipediaTool(BaseTool):
             
             return result
             
-        except ValidationError:
-            return "Termo de pesquisa inválido (2-100 caracteres)"
         except Exception as e:
             logger.exception("Erro inesperado")
             return f"Erro durante a pesquisa: {str(e)}"

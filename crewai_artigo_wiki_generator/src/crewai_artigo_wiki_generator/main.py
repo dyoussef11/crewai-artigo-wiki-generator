@@ -25,12 +25,22 @@ def normalize_output(output: Any) -> Dict[str, Any]:
         if isinstance(output, TaskOutput):
             output = output.raw_output
         
-        # Handle string output (try to parse as JSON)
+        # Handle string output that might be Python dict representation
         if isinstance(output, str):
-            try:
-                output = json.loads(output)
-            except json.JSONDecodeError:
-                return {"raw_output": output}
+            output = output.strip()
+            
+            # Try to detect and convert Python dict string
+            if output.startswith(('{', '[', 'titulo=', 'paragrafos=')):
+                try:
+                    # Convert from Python dict string to actual dict
+                    import ast
+                    output = ast.literal_eval(output)
+                except (ValueError, SyntaxError):
+                    # If that fails, try as JSON
+                    try:
+                        output = json.loads(output)
+                    except json.JSONDecodeError:
+                        pass  # Keep as string
         
         # Handle Pydantic models
         if hasattr(output, 'model_dump'):  # Pydantic v2
@@ -42,72 +52,93 @@ def normalize_output(output: Any) -> Dict[str, Any]:
         if isinstance(output, dict):
             return output
         
-        # Fallback for other types
-        return {"raw_output": str(output)}
+        # Fallback for other types - attempt to extract structure
+        return {
+            "raw_output": str(output),
+            "titulo": getattr(output, 'titulo', "Sem Título"),
+            "topico": getattr(output, 'topico', "Tópico Desconhecido"),
+            "paragrafos": getattr(output, 'paragrafos', [])
+        }
     
     except Exception as e:
         logger.error(f"Normalization failed: {str(e)}")
-        raise ValueError(f"Output normalization error: {str(e)}")
+        return {"error": f"Output normalization error: {str(e)}"}
 
 def validate_article_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and complete article data structure"""
     try:
-        # Handle raw string if present
+        # Handle cases where data might be a string representation
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError:
+                try:
+                    import ast
+                    data = ast.literal_eval(data)
+                except (ValueError, SyntaxError):
+                    raise ValueError("Invalid data format - could not parse as JSON or Python dict")
+
+        # Ensure we have a dictionary at this point
+        if not isinstance(data, dict):
+            raise ValueError("Input data must be a dictionary or convertible to one")
+
+        # Handle raw content if present
         if 'raw' in data and data['raw']:
             try:
-                # Clean and parse the raw JSON
-                raw_str = data['raw'].strip()
-                
-                # Remove potential JSON code block markers
-                if raw_str.startswith('```json') and raw_str.endswith('```'):
-                    raw_str = raw_str[7:-3].strip()
-                
-                # Parse the JSON
-                parsed_data = json.loads(raw_str)
-                
-                # Merge with existing data (raw takes precedence)
-                data = {**data, **parsed_data}
-                
-                # Remove the raw field as it's no longer needed
+                raw_content = data['raw'].strip()
+                if raw_content.startswith('```json') and raw_content.endswith('```'):
+                    raw_content = raw_content[7:-3].strip()
+                parsed_raw = json.loads(raw_content)
+                data = {**data, **parsed_raw}
                 data.pop('raw', None)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse raw JSON: {e}")
-                # If raw is invalid but we have other data, continue
-                if not all(k in data for k in ['titulo', 'topico', 'paragrafos']):
-                    raise ValueError("Invalid raw JSON and missing required fields")
+            except json.JSONDecodeError:
+                logger.warning("Could not parse raw content - proceeding without it")
 
-        # Ensure required fields with defaults
+        # Set defaults
         defaults = {
-            "titulo": "Sem Título",
-            "topico": "Tópico Desconhecido",
-            "paragrafos": [],
+            "titulo": data.get('titulo', "Sem Título"),
+            "topico": data.get('topico', "Tópico Desconhecido"),
+            "paragrafos": data.get('paragrafos', []),
             "data_criacao": datetime.now().isoformat(),
             "autor": "Artigo Multiagente IA",
             "referencias": []
         }
 
-        # Merge provided data with defaults
-        merged_data = {**defaults, **data}
+        # Merge with existing data
+        validated_data = {**defaults, **data}
 
-        # Convert paragraphs to dict if they're Pydantic models
-        if isinstance(merged_data["paragrafos"], list):
-            merged_data["paragrafos"] = [
-                p.model_dump() if hasattr(p, 'model_dump') else 
-                p.dict() if hasattr(p, 'dict') else p
-                for p in merged_data["paragrafos"]
-            ]
+        # Ensure paragraphs have proper structure
+        validated_paragraphs = []
+        for para in validated_data['paragrafos']:
+            if isinstance(para, str):
+                validated_paragraphs.append({
+                    "titulo": "Parágrafo",
+                    "conteudo": para
+                })
+            elif isinstance(para, dict):
+                validated_paragraphs.append({
+                    "titulo": para.get('titulo', "Parágrafo"),
+                    "conteudo": para.get('conteudo', "")
+                })
+            else:
+                # Try to convert other paragraph types
+                validated_paragraphs.append({
+                    "titulo": getattr(para, 'titulo', "Parágrafo"),
+                    "conteudo": getattr(para, 'conteudo', "")
+                })
+
+        validated_data['paragrafos'] = validated_paragraphs
 
         # Validate using Pydantic model
-        artigo = Artigo(**merged_data)
-        
+        artigo = Artigo(**validated_data)
         return artigo.model_dump()
     
     except ValidationError as e:
-        logger.error(f"Validation error: {e}")
-        raise ValueError(f"Invalid article data structure: {e}")
+        logger.error(f"Validation error: {str(e)}")
+        raise ValueError(f"Invalid article structure: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected validation error: {e}")
-        raise ValueError(f"Article validation failed: {e}")
+        logger.error(f"Unexpected validation error: {str(e)}")
+        raise ValueError(f"Article validation failed: {str(e)}")
 
 def execute_crew_process(topic: str) -> Dict[str, Any]:
     """Execute the CrewAI process with robust error handling"""

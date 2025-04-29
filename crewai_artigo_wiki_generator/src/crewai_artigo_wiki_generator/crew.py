@@ -81,6 +81,7 @@ class CrewaiArtigoWikiGenerator:
         """Define e valida o tópico antes de usar"""
         validate_topic_and_interrupt(topic)
         self.topico = topic
+        
     @tool
     def wikipedia_tool(self):
         """
@@ -105,8 +106,7 @@ class CrewaiArtigoWikiGenerator:
             tools=[WikipediaTool()],
             verbose=True,
             allow_delegation=False,
-            max_iter=10,
-            memory=True
+            max_iter=10
         )
 
     @agent
@@ -175,7 +175,7 @@ class CrewaiArtigoWikiGenerator:
         return Task(
             config=self.tasks_config['review_task'],
             output_pydantic=Artigo,
-           
+        
         )
 
     @crew
@@ -194,5 +194,3 @@ class CrewaiArtigoWikiGenerator:
             verbose=True,
         )
 
-    
-   
