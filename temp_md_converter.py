@@ -73,7 +73,7 @@ try:
     # Salvar arquivo
     base_filename = html.unescape(data.get("titulo", "artigo"))
     base_filename = ''.join(c for c in base_filename if c.isalnum() or c in ' _-')
-    output_filename = f"artigos-gerados/{base_filename}_ABNT.md"
+    output_filename = f"artigos-gerados/edicao-final/{base_filename}_ABNT.md"
     
     with open(output_filename, 'w', encoding='utf-8') as f:
         f.write(md_content)

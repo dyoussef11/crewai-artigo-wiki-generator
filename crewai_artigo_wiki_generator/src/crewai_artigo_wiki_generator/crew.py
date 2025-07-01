@@ -3,6 +3,63 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task, tool
 from tools.wikipedia_tool import WikipediaTool
 from models.article_model import Artigo
+from crewai.tasks import TaskOutput
+
+import re
+
+def validate_topic_and_interrupt(topic: str) -> None:
+    """
+    Valida o tópico e interrompe o processo se for considerado inválido.
+    
+    Args:
+        topic: O tópico a ser validado
+        
+    Raises:
+        ValueError: Se o tópico for considerado inválido
+    
+    Validações incluídas:
+    - Não vazio e é string
+    - Tamanho mínimo (3 caracteres)
+    - Não apenas números
+    - Padrões repetitivos (como "awdawdawd")
+    - Não apenas caracteres especiais
+    - Permite siglas (mais de 1 letra em maiúsculas)
+    """
+    # Validação básica
+    if not topic or not isinstance(topic, str):
+        raise ValueError("Tópico não pode ser vazio ou não-string")
+    
+    stripped_topic = topic.strip()
+    
+    if len(stripped_topic) < 2:
+        raise ValueError("Tópico muito curto (mínimo 2 caracteres)")
+    
+    if stripped_topic.isdigit():
+        raise ValueError("Tópico não pode conter apenas números")
+    
+    # Verifica se é apenas caracteres especiais/repetitivos
+    if re.fullmatch(r'[\W_]+', stripped_topic):
+        raise ValueError("Tópico não pode conter apenas caracteres especiais")
+    
+    # Detecta padrões repetitivos (como "abcabcabc" ou "aaaaaa")
+    if len(stripped_topic) > 5:  # Só aplica para tópicos maiores
+        # Verifica sequências repetidas
+        if re.search(r'(.+)\1+', stripped_topic.lower()):
+            raise ValueError("Tópico contém padrões repetitivos sem sentido")
+        
+        # Verifica muitas letras repetidas
+        if any(char * 4 in stripped_topic.lower() for char in stripped_topic.lower()):
+            raise ValueError("Tópico contém muitas repetições de caracteres")
+    
+    # Verifica se é uma sigla válida (mais de 1 letra maiúscula, sem números)
+    if stripped_topic.isupper() and len(stripped_topic) > 1 and stripped_topic.isalpha():
+        return  # Siglas válidas são aceitas
+    
+    # Verifica se tem pelo menos 2 letras diferentes
+    unique_chars = set(stripped_topic.lower())
+    if len(unique_chars) < 2 and len(stripped_topic) >= 5:
+        raise ValueError("Tópico contém pouca variação de caracteres")
+
 
 @CrewBase
 class CrewaiArtigoWikiGenerator:
@@ -15,7 +72,16 @@ class CrewaiArtigoWikiGenerator:
 
     agents_config = 'config/agents.yaml'
     tasks_config = 'config/tasks.yaml'
+    
+    def __init__(self):
+        self.topico = None  # Inicializa como None
 
+    def set_topic(self, topic:str):
+        
+        """Define e valida o tópico antes de usar"""
+        validate_topic_and_interrupt(topic)
+        self.topico = topic
+        
     @tool
     def wikipedia_tool(self):
         """
@@ -38,7 +104,9 @@ class CrewaiArtigoWikiGenerator:
         return Agent(
             config=self.agents_config['researcher'],
             tools=[WikipediaTool()],
-            verbose=True
+            verbose=True,
+            allow_delegation=False,
+            max_iter=10
         )
 
     @agent
@@ -51,6 +119,7 @@ class CrewaiArtigoWikiGenerator:
         """
         return Agent(
             config=self.agents_config['reporting_analyst'],
+            allow_delegation=False,
             verbose=True
         )
 
@@ -64,20 +133,22 @@ class CrewaiArtigoWikiGenerator:
         """
         return Agent(
             config=self.agents_config['reviewer'],
+            allow_delegation=False,
             verbose=False
         )
 
     @task
     def research_task(self) -> Task:
-        """
-        Tarefa de pesquisa, utilizando o WikipediaTool.
+        def validate_result(result: str) -> TaskOutput:
+            if "não encontrado" in result.lower() or "falha" in result.lower() or "erro" in result.lower():
+                raise f"Pesquisa falhou: {result}"
+            return TaskOutput(output=result)
 
-        Returns:
-            Task: Tarefa configurada para pesquisa inicial.
-        """
         return Task(
             config=self.tasks_config['research_task'],
             tools=[WikipediaTool()],
+            allow_delegation=False,
+            output_parser=validate_result,  # aqui está o pulo do gato!
         )
 
     @task
@@ -90,7 +161,7 @@ class CrewaiArtigoWikiGenerator:
         """
         return Task(
             config=self.tasks_config['reporting_task'],
-            output_file='artigos-gerados/Versão_preliminar.md'
+            
         )
 
     @task
@@ -104,8 +175,7 @@ class CrewaiArtigoWikiGenerator:
         return Task(
             config=self.tasks_config['review_task'],
             output_pydantic=Artigo,
-            output_file='artigos-gerados/Artigo_Final.json',
-            additional_output_file='artigos-gerados/Artigo_ABNT.json'
+        
         )
 
     @crew
@@ -116,9 +186,6 @@ class CrewaiArtigoWikiGenerator:
         Returns:
             Crew: A crew completa pronta para execução.
         """
-        if self._is_valid_topic(" "):
-            raise Exception("Tópico inválido, interrompendo o processo.")
-
         return Crew(
             agents=self.agents,
             tasks=self.tasks,
@@ -127,14 +194,3 @@ class CrewaiArtigoWikiGenerator:
             verbose=True,
         )
 
-    def _is_valid_topic(self, topic: str) -> bool:
-        """
-        Verifica se o tópico fornecido é válido.
-
-        Args:
-            topic (str): Tópico a ser validado.
-
-        Returns:
-            bool: True se o tópico for válido, False caso contrário.
-        """
-        return topic.lower().strip() != ""
