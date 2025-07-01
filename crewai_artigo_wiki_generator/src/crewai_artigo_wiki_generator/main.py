@@ -1,194 +1,189 @@
-import json
-import logging
+import os
+import sys
+from urllib import request
+import warnings
 from datetime import datetime
-import traceback
-from typing import Dict, Any
-from urllib.parse import unquote
-from flask import request, jsonify
-from flask import Flask
-from pydantic import ValidationError
-from crewai import Crew
-from crewai.task import TaskOutput
-from models.article_model import Artigo # Your Pydantic model
 from crew import CrewaiArtigoWikiGenerator
+from models.article_model import Artigo, Paragrafo
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from flask import Flask, request, jsonify
+import logging
+from litellm import RateLimitError
 
-# Configure logging
+# Configuração do log
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Ignorar avisos de syntax warning relacionados ao pysbd
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+
+# Definir o modelo de dados para a requisição
+class ArticleRequest(BaseModel):
+    """
+    Modelo para a requisição de geração de artigo.
+
+    Atributos:
+        topic (str): Tópico do artigo a ser gerado.
+    """
+    topic: str
+
+# Inicializando o aplicativo Flask
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def normalize_output(output: Any) -> Dict[str, Any]:
-    """Normalize CrewAI output to consistent dictionary format"""
-    try:
-        # Handle TaskOutput objects
-        if isinstance(output, TaskOutput):
-            output = output.raw_output
-        
-        # Handle string output that might be Python dict representation
-        if isinstance(output, str):
-            output = output.strip()
-            
-            # Try to detect and convert Python dict string
-            if output.startswith(('{', '[', 'titulo=', 'paragrafos=')):
-                try:
-                    # Convert from Python dict string to actual dict
-                    import ast
-                    output = ast.literal_eval(output)
-                except (ValueError, SyntaxError):
-                    # If that fails, try as JSON
-                    try:
-                        output = json.loads(output)
-                    except json.JSONDecodeError:
-                        pass  # Keep as string
-        
-        # Handle Pydantic models
-        if hasattr(output, 'model_dump'):  # Pydantic v2
-            return output.model_dump()
-        elif hasattr(output, 'dict'):  # Pydantic v1
-            return output.dict()
-        
-        # Handle dictionaries directly
-        if isinstance(output, dict):
-            return output
-        
-        # Fallback for other types - attempt to extract structure
-        return {
-            "raw_output": str(output),
-            "titulo": getattr(output, 'titulo', "Sem Título"),
-            "topico": getattr(output, 'topico', "Tópico Desconhecido"),
-            "paragrafos": getattr(output, 'paragrafos', [])
-        }
+def execute_crew_process(topic: str):
+    """
+    Função para executar o processo do CrewAI e gerar o artigo com base no tópico fornecido.
+
+    Args:
+        topic (str): Tópico do artigo a ser gerado.
+
+    Returns:
+        dict: Retorna um dicionário com os dados do artigo gerado ou um erro.
+    """
+    logger.info(f"Iniciando a geração do artigo sobre o tópico: {topic}")
     
-    except Exception as e:
-        logger.error(f"Normalization failed: {str(e)}")
-        return {"error": f"Output normalization error: {str(e)}"}
-
-def validate_article_data(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate and complete article data structure"""
     try:
-        # Handle cases where data might be a string representation
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except json.JSONDecodeError:
-                try:
-                    import ast
-                    data = ast.literal_eval(data)
-                except (ValueError, SyntaxError):
-                    raise ValueError("Invalid data format - could not parse as JSON or Python dict")
+        inputs = {"topic": topic}
+        response = CrewaiArtigoWikiGenerator().crew().kickoff(inputs=inputs)
 
-        # Ensure we have a dictionary at this point
-        if not isinstance(data, dict):
-            raise ValueError("Input data must be a dictionary or convertible to one")
-
-        # Handle raw content if present
-        if 'raw' in data and data['raw']:
-            try:
-                raw_content = data['raw'].strip()
-                if raw_content.startswith('```json') and raw_content.endswith('```'):
-                    raw_content = raw_content[7:-3].strip()
-                parsed_raw = json.loads(raw_content)
-                data = {**data, **parsed_raw}
-                data.pop('raw', None)
-            except json.JSONDecodeError:
-                logger.warning("Could not parse raw content - proceeding without it")
-
-        # Set defaults
-        defaults = {
-            "titulo": data.get('titulo', "Sem Título"),
-            "topico": data.get('topico', "Tópico Desconhecido"),
-            "paragrafos": data.get('paragrafos', []),
-            "data_criacao": datetime.now().isoformat(),
-            "autor": "Artigo Multiagente IA",
-            "referencias": []
+        artigo = {
+            "titulo": response["titulo"],
+            "topico": response.get("topico", "Informações não encontradas"),
+            "data_criacao": response.get("data_criacao", "Data não disponível"),
+            "autor": response.get("autor", "Autor desconhecido"),
+            "paragrafos": response.get("paragrafos", []),
+            "referencias": response.get("referencias", []),
         }
 
-        # Merge with existing data
-        validated_data = {**defaults, **data}
+        return artigo
 
-        # Ensure paragraphs have proper structure
-        validated_paragraphs = []
-        for para in validated_data['paragrafos']:
-            if isinstance(para, str):
-                validated_paragraphs.append({
-                    "titulo": "Parágrafo",
-                    "conteudo": para
-                })
-            elif isinstance(para, dict):
-                validated_paragraphs.append({
-                    "titulo": para.get('titulo', "Parágrafo"),
-                    "conteudo": para.get('conteudo', "")
-                })
-            else:
-                # Try to convert other paragraph types
-                validated_paragraphs.append({
-                    "titulo": getattr(para, 'titulo', "Parágrafo"),
-                    "conteudo": getattr(para, 'conteudo', "")
-                })
+    except RateLimitError as e:
+        logger.warning(f"Limite de uso atingido: {e}")
+        return {"error": "Limite de uso da API atingido. Tente novamente em alguns minutos."}
 
-        validated_data['paragrafos'] = validated_paragraphs
-
-        # Validate using Pydantic model
-        artigo = Artigo(**validated_data)
-        return artigo.model_dump()
-    
-    except ValidationError as e:
-        logger.error(f"Validation error: {str(e)}")
-        raise ValueError(f"Invalid article structure: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected validation error: {str(e)}")
-        raise ValueError(f"Article validation failed: {str(e)}")
+        logger.error(f"Erro ao gerar o artigo: {e}")
+        return {"error": f"Erro ao gerar o artigo: {e}"}
 
-def execute_crew_process(topic: str) -> Dict[str, Any]:
-    """Execute the CrewAI process with robust error handling"""
-    try:
-        logger.info(f"Starting article generation for: {topic}")
-        
-        
-        # Initialize and execute crew
-        result = CrewaiArtigoWikiGenerator().crew().kickoff(inputs={"topic": topic})
-        
-        # Normalize and validate output
-        print(result)
-        normalized = normalize_output(result)
-        validated = validate_article_data(normalized)
-        
-        # Debug logging
-        logger.debug(f"Final output structure: {json.dumps(validated, indent=2, ensure_ascii=False)}")
-        
-        return validated
-    
-    except Exception as e:
-        logger.error(f"Process execution failed: {str(e)}")
-        return {"error": str(e)}
-
-@app.route("/generate_article", methods=["GET"])
+@app.route("/generate_article", methods=["POST", "GET"])
 def generate_article():
-    try:
-        topic = request.args.get('topic', '').strip()
+    """
+    Endpoint para gerar um artigo a partir de um tópico.
+
+    Suporta os métodos HTTP GET e POST:
+        - GET: Obtém o tópico a partir do parâmetro de consulta.
+        - POST: Recebe o JSON com o tópico para gerar o artigo.
+
+    Retorna:
+        dict: Resultado da geração do artigo ou erro.
+    """
+    if request.method == "GET":
+        topic = request.args.get("topic")
+
+        # Verifica se o tópico foi fornecido
         if not topic:
-            return jsonify({"error": "O parâmetro 'topic' é obrigatório"}), 400
-        
-        # Initialize the generator
-        result = execute_crew_process(topic)
-        
-        return jsonify(result)
-        
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": f"Erro interno: {str(e)}"}), 500
+            return jsonify({"error": "O tópico não pode estar vazio."}), 400
+
+        artigo = execute_crew_process(topic)
+
+        if "error" in artigo:
+            return jsonify(artigo), 500
+
+        return jsonify(artigo), 200
 
 
 
+# @app.post("/train_crew/")
+# async def train_crew(iterations: int, filename: str):
+#     """
+#     Endpoint para treinar o CrewAI com o número de iterações e o nome do arquivo fornecido.
 
-@app.after_request
-def add_headers(response):
-    """Ensure proper content type and encoding"""
-    response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    return response
+#     Args:
+#         iterations (int): Número de iterações para o treinamento.
+#         filename (str): Nome do arquivo com os dados de treinamento.
+
+#     Returns:
+#         dict: Mensagem de sucesso ou erro.
+#     """
+#     inputs = {
+#         "topic": "AI LLMs"
+#     }
+
+#     try:
+#         logger.info(f"Iniciando treinamento do CrewAI com {iterations} iterações usando o arquivo {filename}...")
+#         CrewaiArtigoWikiGenerator().crew().train(n_iterations=iterations, filename=filename, inputs=inputs)
+
+#         logger.info(f"CrewAI treinado com {iterations} iterações.")
+#         return {"message": f"CrewAI treinado com {iterations} iterações."}
+#     except Exception as e:
+#         logger.error(f"Erro ao treinar o CrewAI: {e}")
+#         raise HTTPException(status_code=500, detail="Erro ao treinar o CrewAI.")
+
+# @app.post("/replay_task/")
+# async def replay_task(task_id: str):
+#     """
+#     Endpoint para reproduzir a execução do CrewAI a partir de um task_id específico.
+
+#     Args:
+#         task_id (str): ID do task a ser reproduzido.
+
+#     Returns:
+#         dict: Mensagem de sucesso ou erro.
+#     """
+#     try:
+#         logger.info(f"Iniciando o replay do task {task_id}...")
+#         CrewaiArtigoWikiGenerator().crew().replay(task_id=task_id)
+
+#         logger.info(f"Replay do task {task_id} iniciado com sucesso.")
+#         return {"message": f"Replay do task {task_id} iniciado com sucesso."}
+#     except Exception as e:
+#         logger.error(f"Erro ao reproduzir o task: {e}")
+#         raise HTTPException(status_code=500, detail="Erro ao reproduzir a execução do CrewAI.")
+
+# @app.post("/test_crew/")
+# async def test_crew(iterations: int, openai_model_name: str):
+#     """
+#     Endpoint para testar a execução do CrewAI com um número específico de iterações e modelo OpenAI.
+
+#     Args:
+#         iterations (int): Número de iterações para o teste.
+#         openai_model_name (str): Nome do modelo OpenAI a ser utilizado.
+
+#     Returns:
+#         dict: Mensagem de sucesso ou erro.
+#     """
+#     inputs = {
+#         "topic": "Games",
+#         "current_year": str(datetime.now().year)
+#     }
+
+#     try:
+#         logger.info(f"Iniciando teste do CrewAI com {iterations} iterações e modelo OpenAI {openai_model_name}...")
+#         CrewaiArtigoWikiGenerator().crew().test(n_iterations=iterations, openai_model_name=openai_model_name, inputs=inputs)
+
+#         logger.info(f"Teste do CrewAI com {iterations} iterações e modelo {openai_model_name} concluído com sucesso.")
+#         return {"message": f"Teste do CrewAI com {iterations} iterações e modelo {openai_model_name} concluído com sucesso."}
+#     except Exception as e:
+#         logger.error(f"Erro ao testar o CrewAI: {e}")
+#         raise HTTPException(status_code=500, detail="Erro ao testar o CrewAI.")
 
 if __name__ == "__main__":
+    """
+    Inicia o servidor Flask na porta 5000.
+    """
+    initial_topic = None
+    if len(sys.argv) > 1:
+        initial_topic = sys.argv[1]
+        logger.info(f"Tópico inicial recebido via linha de comando: {initial_topic}")
+        # You could potentially trigger the article generation here
+        # or store this topic to be used when the /generate_article
+        # endpoint is accessed.
+        execute_crew_process(initial_topic)
+        
+        
+    
     app.run(host="0.0.0.0", port=5000, debug=True)
+    

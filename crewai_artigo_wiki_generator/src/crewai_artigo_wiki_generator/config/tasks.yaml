@@ -1,31 +1,19 @@
 research_task:
-# CAMADA DE CONTEXTO
   description: >
-
     Realize uma pesquisa na Wikipedia sobre o seguinte tópico: "{topic}".
 
-    1. FASE DE COLETA:
-      - Execute buscas estratégicas usando operadores avançados na `wikipedia_tool`
-      - Priorize artigos com status "Featured" ou "Good Article"
-      - Verifique a última data de atualização do artigo
-    
-    2. FASE DE ANÁLISE:
-      - Identifique os 5-7 conceitos nucleares do "{topic}"
-      - Mapeie relações causais e temporais
-      - Destaque dados quantitativos relevantes
-      - Sinalize eventuais lacunas informacionais
-    
-    3. FASE DE SÍNTESE:
-      - Estruture o conteúdo em núcleos temáticos
-      - Mantenha rigorosa fidelidade às fontes
-      - Aplique o princípio da progressão informativa
-
+    Instruções:
+    - Use exclusivamente a ferramenta `wikipedia_tool` para obter as informações.
+    - Não invente dados, apenas sintetize o conteúdo obtido da Wikipedia.
+    - Organize a resposta em pelo menos 5 parágrafos coesos e informativos.
+    - O texto deve ser claro, objetivo, técnico e acessível, livre de opiniões e especulações.
+    - Não inclua repetições ou frases genéricas.
+  
   expected_output: >
-    Um texto corrido e coeso com pelo menos dez parágrafos informativos e relevantes,
+    Um texto corrido e coeso com pelo menos cinco parágrafos informativos e relevantes,
     exclusivamente baseado no conteúdo extraído da Wikipedia através da ferramenta `wikipedia_tool`.
 
   agent: researcher
-
 
 reporting_task:
   description: >
@@ -54,7 +42,7 @@ reporting_task:
 
 review_task:
   description: >
-    Revise o artigo gerado, atentando-se aos seguintes pontos (se mantendo naquelas quantidade minima de 300 palavras):
+    Revise o artigo gerado, atentando-se aos seguintes pontos:
 
     - Ortografia, gramática, pontuação e estilo.
     - Clareza, coesão e fluidez textual.

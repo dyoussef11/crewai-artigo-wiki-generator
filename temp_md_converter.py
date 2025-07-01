@@ -19,7 +19,7 @@ def formatar_referencia_abnt(ref: str) -> str:
     return f"{ref}."
 
 try:
-    with open('artigos-gerados-exemplo/json/artigo_Meio Ambiente.json', 'r', encoding='utf-8') as f:
+    with open('artigos-gerados/Artigo_Final.json', 'r', encoding='utf-8') as f:
         data = json.load(f)
 
     # Processar data no formato ABNT (dia/mês/ano)
@@ -73,7 +73,7 @@ try:
     # Salvar arquivo
     base_filename = html.unescape(data.get("titulo", "artigo"))
     base_filename = ''.join(c for c in base_filename if c.isalnum() or c in ' _-')
-    output_filename = f"artigos-gerados-exemplo/{base_filename}_ABNT.md"
+    output_filename = f"artigos-gerados/{base_filename}_ABNT.md"
     
     with open(output_filename, 'w', encoding='utf-8') as f:
         f.write(md_content)
