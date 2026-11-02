@@ -1,3 +1,6 @@
 /.mypy_cache
 /.venv
 /.__pycache__
+
+.env
+crewai_artigo_wiki_generator\.env
