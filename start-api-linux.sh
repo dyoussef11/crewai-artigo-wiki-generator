@@ -1,131 +1,141 @@
 #!/bin/bash
+set -e
 
-# Color configuration
+# ============================================================
+# Cores
+# ============================================================
 RED='\033[91m'
 GREEN='\033[92m'
 YELLOW='\033[93m'
-BLUE='\033[94m'
 RESET='\033[0m'
 
-# Python check
-if ! command -v python &> /dev/null; then
-    echo -e "${RED}Python not found in PATH${RESET}"
-    read -p "Press any key to continue..."
+# ============================================================
+# Diretórios
+# ============================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR/crewai_generator_wiki_article"
+
+# ============================================================
+# Verificações iniciais
+# ============================================================
+if ! command -v uv &> /dev/null; then
+    echo -e "${RED}uv nao encontrado. Instale: https://docs.astral.sh/uv/${RESET}"
+    read -p "Pressione Enter para sair..."
     exit 1
 fi
 
-# Virtual environment setup
-if [ ! -d ".venv" ]; then
-    echo -e "${GREEN}Creating virtual environment...${RESET}"
-    python -m venv .venv || {
-        echo -e "${RED}Failed to create virtual environment${RESET}"
-        read -p "Press any key to continue..."
-        exit 1
-    }
+if [ ! -f "$PROJECT_DIR/pyproject.toml" ]; then
+    echo -e "${RED}Projeto nao encontrado em: $PROJECT_DIR${RESET}"
+    read -p "Pressione Enter para sair..."
+    exit 1
 fi
 
-echo -e "${YELLOW}Activating virtual environment...${RESET}"
-source .venv/bin/activate || {
-    echo -e "${RED}Failed to activate virtual environment${RESET}"
-    read -p "Press any key to continue..."
+# ============================================================
+# Sincroniza dependências
+# ============================================================
+echo -e "${GREEN}Sincronizando dependencias com uv...${RESET}"
+cd "$PROJECT_DIR"
+uv sync --extra dev || {
+    echo -e "${RED}Falha ao sincronizar dependencias${RESET}"
+    read -p "Pressione Enter para sair..."
     exit 1
 }
 
-# Install dependencies
-if [ -f "requirements.txt" ]; then
-    echo -e "${GREEN}Installing dependencies...${RESET}"
-    pip install -r requirements.txt || {
-        echo -e "${RED}Failed to install dependencies${RESET}"
-        read -p "Press any key to continue..."
-        exit 1
-    }
-fi
-
-# Get and validate topic
+# ============================================================
+# Solicita e valida o tópico
+# ============================================================
 get_topic() {
     while true; do
         echo
-        read -p "Digite o tópico para o artigo: " TOPIC
-        
-        # Python validation
-        python -c "
-import sys, re
+        read -p "Digite o topico para o artigo: " TOPIC
+
+        uv run --quiet python -c "
+import sys
 t = sys.argv[1].strip()
-exit(1) if (not t or len(t)<3 or t.isdigit() or all(not c.isalnum() for c in t)) else exit(0)
+if not t or len(t) < 3 or t.isdigit() or all(not c.isalnum() for c in t):
+    sys.exit(1)
+sys.exit(0)
 " "$TOPIC" && break
-        
-        echo -e "${RED}Tópico inválido! Por favor, insira um tópico significativo.${RESET}"
+
+        echo -e "${RED}Topico invalido! Use ao menos 3 caracteres alfanumericos.${RESET}"
     done
 }
 
 get_topic
 
-# Normalize topic for URL and filename
-echo -e "${YELLOW}Normalizando tópico...${RESET}"
+# ============================================================
+# Normaliza o nome do arquivo
+# ============================================================
+CLEAN_TOPIC=$(uv run --quiet python "$SCRIPT_DIR/sanitize.py" "$TOPIC" | tr -d '\r\n')
+[ -z "$CLEAN_TOPIC" ] && CLEAN_TOPIC="artigo"
 
-ENCODED_TOPIC=$(python -c "
-import urllib.parse, re
-topic = r'''$TOPIC'''
-encoded = urllib.parse.quote(topic)
-clean = re.sub(r'[^\w\-_]', '_', topic)
-print(f'{encoded}|{clean[:50]}')
-")
-
-IFS='|' read -r ENCODED_TOPIC CLEAN_FILENAME <<< "$ENCODED_TOPIC"
-
-if [ -z "$ENCODED_TOPIC" ]; then
-    echo -e "${RED}Falha ao normalizar o tópico!${RESET}"
-    get_topic
+if [ "$CLEAN_TOPIC" = "artigo" ]; then
+    BASE_FILENAME="artigo"
+else
+    BASE_FILENAME="artigo_${CLEAN_TOPIC}"
 fi
 
-# Start Flask server
-echo -e "${YELLOW}Iniciando servidor Flask...${RESET}"
-gnome-terminal -- python crewai-artigo-wiki-generator/crewai_artigo_wiki_generator/src/crewai_artigo_wiki_generator/main.py &
-FLASK_PID=$!
+# ============================================================
+# Prepara diretórios de saída
+# ============================================================
+OUTPUT_DIR_JSON="$SCRIPT_DIR/artigos-gerados/json"
+OUTPUT_DIR_MD="$SCRIPT_DIR/artigos-gerados/edicao-final"
+mkdir -p "$OUTPUT_DIR_JSON" "$OUTPUT_DIR_MD"
 
-# Wait for initialization
-echo -e "${YELLOW}Aguardando inicialização do servidor...${RESET}"
-sleep 10
+OUTPUT_JSON="$OUTPUT_DIR_JSON/$BASE_FILENAME.json"
+OUTPUT_MD="$OUTPUT_DIR_MD/$BASE_FILENAME.md"
 
-# Generate clean filename
-CLEAN_TOPIC=$(echo "$TOPIC" | tr -d '/\:?&')
-BASE_FILENAME="artigo_${CLEAN_TOPIC:0:50}"
-
-# Create output directory if it doesn't exist
-mkdir -p "artigos-gerados-exemplo/json"
-
-echo -e "${GREEN}Gerando artigo...${RESET}"
-
-# Show curl command
-echo "Comando curl que será executado:"
-echo "curl -X GET \"http://127.0.0.1:5000/generate_article?topic=$ENCODED_TOPIC\" \\"
-echo "     -H \"Accept: application/json; charset=utf-8\" \\"
-echo "     -o \"artigos-gerados-exemplo/json/$BASE_FILENAME.json\""
+# ============================================================
+# Executa o crew
+# ============================================================
+echo
+echo -e "${GREEN}Gerando artigo sobre \"$TOPIC\"...${RESET}"
+echo -e "${YELLOW}JSON:     $OUTPUT_JSON${RESET}"
+echo -e "${YELLOW}Markdown: $OUTPUT_MD${RESET}"
 echo
 
-# Execute curl
-curl -X GET "http://127.0.0.1:5000/generate_article?topic=$ENCODED_TOPIC" \
-     -H "Accept: application/json; charset=utf-8" \
-     -o "artigos-gerados-exemplo/json/$BASE_FILENAME.json" || {
-    echo -e "${RED}Falha ao gerar artigo${RESET}"
-    read -p "Press any key to continue..."
-    kill $FLASK_PID
-    exit 1
-}
-
-# Verify JSON was created
-if [ ! -f "artigos-gerados-exemplo/json/$BASE_FILENAME.json" ]; then
-    echo -e "${RED}Arquivo JSON não foi criado corretamente${RESET}"
-    read -p "Press any key to continue..."
-    kill $FLASK_PID
+if ! uv run python src/crewai_generator_wiki_article/main.py "$TOPIC" \
+        --output "$OUTPUT_JSON" \
+        --output-md "$OUTPUT_MD"; then
+    echo
+    echo -e "${RED}Falha ao gerar o artigo. Veja os logs acima.${RESET}"
+    read -p "Pressione Enter para sair..."
     exit 1
 fi
 
-echo -e "- artigos-gerados-exemplo/json/$BASE_FILENAME.json (dados estruturados)"
+if [ ! -f "$OUTPUT_JSON" ]; then
+    echo -e "${RED}Arquivo JSON nao foi criado: $OUTPUT_JSON${RESET}"
+    read -p "Pressione Enter para sair..."
+    exit 1
+fi
 
-# Open the file
-xdg-open "artigos-gerados-exemplo/json/$BASE_FILENAME.json"
+if [ ! -f "$OUTPUT_MD" ]; then
+    echo -e "${RED}Arquivo Markdown nao foi criado: $OUTPUT_MD${RESET}"
+    read -p "Pressione Enter para sair..."
+    exit 1
+fi
 
+# ============================================================
+# Resultado
+# ============================================================
 echo
-read -p "Press any key to continue..."
-kill $FLASK_PID
+echo -e "${GREEN}============================================================${RESET}"
+echo -e "${GREEN}  Artigo gerado com sucesso!${RESET}"
+echo -e "${GREEN}============================================================${RESET}"
+echo "  JSON:     $OUTPUT_JSON"
+echo "  Markdown: $OUTPUT_MD"
+echo -e "${GREEN}============================================================${RESET}"
+echo
+
+# Abre os dois arquivos com o handler padrão
+if command -v xdg-open &> /dev/null; then
+    xdg-open "$OUTPUT_JSON" >/dev/null 2>&1 &
+    xdg-open "$OUTPUT_MD"   >/dev/null 2>&1 &
+elif command -v open &> /dev/null; then
+    open "$OUTPUT_JSON"
+    open "$OUTPUT_MD"
+else
+    echo -e "${YELLOW}Nao foi possivel abrir automaticamente. Abra manualmente.${RESET}"
+fi
+
+read -p "Pressione Enter para sair..."
