@@ -1,0 +1,52 @@
+research_task:
+  description: >
+    Pesquise sobre "{topic}" na Wikipedia usando a ferramenta `wikipedia_tool`.
+
+    REGRAS CRÍTICAS:
+    1. Faça NO MÁXIMO 3 chamadas à ferramenta.
+    2. Se a PRIMEIRA busca retornar o bloco `[FONTE: ... | URL: ...]` com texto substancial, PARE IMEDIATAMENTE e use esse conteúdo.
+    3. Se a primeira busca retornar apenas sugestões, escolha a sugestão mais relevante e faça UMA segunda chamada.
+    4. Se a segunda chamada também falhar, NÃO faça uma terceira. Use o que já tem ou retorne "Pesquisa inconclusiva".
+    5. Após a busca, escreva sua resposta final em TEXTO CORRIDO. Não chame a ferramenta novamente.
+  expected_output: >
+    Um texto corrido e coeso com pelo menos cinco parágrafos informativos.
+    No final do texto, inclua a linha exata da fonte: "[FONTE: <título> | URL: <url>]".
+  agent: researcher
+
+reporting_task:
+  description: >
+    Com base EXCLUSIVA no conteúdo do pesquisador, escreva um artigo com:
+    - Entre 200 e 250 palavras.
+    - Estrutura: introdução, desenvolvimento e conclusão.
+    - Português formal e coeso.
+  expected_output: >
+    Um artigo completo com aproximadamente 250 palavras, em parágrafos lógicos.
+  agent: reporting_analyst
+  context:
+    - research_task
+
+review_task:
+  description: >
+    Revise o artigo, corrigindo ortografia e gramática.
+    A fonte usada está no bloco "[FONTE: ... | URL: ...]" fornecido pelo pesquisador.
+    Com base nela, crie a lista de referências em formato ABNT, citando o verbete da Wikipedia.
+    Retorne APENAS um objeto JSON válido como texto, sem markdown e sem tool calls.
+    O JSON deve ter os campos: titulo, topico, autor, paragrafos (lista de {titulo, conteudo}) e referencias (lista de strings).
+  expected_output: |
+    {
+      "titulo": "...",
+      "topico": "...",
+      "autor": "MultiAgente AI",
+      "paragrafos": [
+        {"titulo": "Introdução", "conteudo": "..."},
+        {"titulo": "Desenvolvimento", "conteudo": "..."},
+        {"titulo": "Conclusão", "conteudo": "..."}
+      ],
+      "referencias": [
+        "WIKIPÉDIA. Cerrado. Disponível em: <https://pt.wikipedia.org/wiki/Cerrado>. Acesso em: 02 nov. 2026."
+      ]
+    }
+  agent: reviewer
+  context:
+    - research_task      # <-- fornece a URL da fonte
+    - reporting_task     # <-- fornece o artigo revisado

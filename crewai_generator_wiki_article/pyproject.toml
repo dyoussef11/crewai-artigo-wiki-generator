@@ -1,0 +1,46 @@
+[project]
+name = "crewai_generator_wiki_article"
+version = "0.1.0"
+description = "crewai_generator_wiki_article using crewAI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[tools,litellm]>=1.15.0,<2.0.0",
+    "flask>=3.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "deptry>=0.20.0",
+    "pytest-cov>=5.0.0",
+]
+
+[project.scripts]
+crewai_generator_wiki_article = "crewai_generator_wiki_article.main:run"
+run_crew = "crewai_generator_wiki_article.main:run"
+train = "crewai_generator_wiki_article.main:train"
+replay = "crewai_generator_wiki_article.main:replay"
+test = "crewai_generator_wiki_article.main:test"
+run_with_trigger = "crewai_generator_wiki_article.main:run_with_trigger"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "crew"
+project_id = "b53a6e86-6bf9-4af6-aab3-cb44d1361056"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:crewai.*",
+]
+markers = [
+    "credentialed: tests that need a real LLM provider key",
+]

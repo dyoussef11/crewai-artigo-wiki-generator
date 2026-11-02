@@ -1,0 +1,46 @@
+research_task:
+  description: >
+    Pesquise sobre "{topic}" na Wikipedia.
+    REGRAS CRÍTICAS:
+    1. Faça NO MÁXIMO 3 chamadas à ferramenta `wikipedia_tool`.
+    2. Se a primeira busca retornar conteúdo substancial sobre "{topic}", PARE IMEDIATAMENTE e use esse conteúdo.
+    3. Se a busca retornar apenas sugestões, escolha a mais relevante e faça uma segunda chamada.
+    4. NUNCA repita a mesma consulta. Se a segunda chamada falhar, use o conteúdo da primeira.
+    5. Após as buscas, escreva sua resposta final em TEXTO CORRIDO, sem chamar ferramentas novamente.
+  expected_output: >
+    Um texto corrido e coeso com pelo menos cinco parágrafos informativos,
+    exclusivamente baseado no conteúdo extraído da Wikipedia.
+  agent: researcher
+
+reporting_task:
+  description: >
+    Com base EXCLUSIVA no conteúdo do pesquisador, escreva um artigo com:
+    - Entre 200 e 250 palavras.
+    - Estrutura: introdução, desenvolvimento e conclusão.
+    - Português formal e coeso.
+  expected_output: >
+    Um artigo completo com aproximadamente 250 palavras, em parágrafos lógicos.
+  agent: reporting_analyst
+  context:
+    - research_task
+
+review_task:
+  description: >
+    Revise o artigo, corrigindo ortografia e gramática.
+    Retorne APENAS um objeto JSON válido como texto, sem markdown e sem tool calls.
+    O JSON deve ter os campos: titulo, topico, autor, paragrafos (lista de {titulo, conteudo}) e referencias.
+  expected_output: |
+    {
+      "titulo": "...",
+      "topico": "...",
+      "autor": "MultiAgente AI",
+      "paragrafos": [
+        {"titulo": "Introdução", "conteudo": "..."},
+        {"titulo": "Desenvolvimento", "conteudo": "..."},
+        {"titulo": "Conclusão", "conteudo": "..."}
+      ],
+      "referencias": []
+    }
+  agent: reviewer
+  context:
+    - reporting_task
